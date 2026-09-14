@@ -1024,8 +1024,17 @@
   async function loadChatInbox(){
     const list = document.getElementById('chatInboxList');
     if(inboxUnsubscribe) inboxUnsubscribe();
+    list.className = 'empty-state';
+    list.innerHTML = 'กำลังโหลดบทสนทนา...';
+    let inboxSettled = false;
+    const inboxTimeout = setTimeout(() => {
+      if(inboxSettled) return;
+      list.innerHTML = '<div class="empty-state">โหลดกล่องแชทนานเกินไป กรุณารีเฟรชหน้าเว็บ</div>';
+    }, 10000);
     const inboxQuery = query(messagesRef, where('participantUids', 'array-contains', currentUser.uid));
     inboxUnsubscribe = onSnapshot(inboxQuery, async snapshot => {
+      inboxSettled = true;
+      clearTimeout(inboxTimeout);
       const grouped = new Map();
       snapshot.docs.forEach(item => {
         const message = { id:item.id, ...item.data() };
@@ -1033,18 +1042,23 @@
         if(!previous || (message.createdAt?.seconds || 0) > (previous.createdAt?.seconds || 0)) grouped.set(message.conversationId, message);
       });
       const conversations = await Promise.all([...grouped.values()].map(async latest => {
-        let product = PRODUCTS.find(item => item.id === latest.productId);
-        if(!product){
-          const productSnapshot = await getDoc(doc(db, 'products', latest.productId));
-          product = productSnapshot.exists() ? { id:productSnapshot.id, ...productSnapshot.data() } : null;
+        try {
+          let product = PRODUCTS.find(item => item.id === latest.productId);
+          if(!product){
+            const productSnapshot = await getDoc(doc(db, 'products', latest.productId));
+            product = productSnapshot.exists() ? { id:productSnapshot.id, ...productSnapshot.data() } : null;
+          }
+          let senderProfile = null;
+          if(latest.senderUid){
+            const profileSnapshot = await getDoc(doc(db, 'users', latest.senderUid));
+            senderProfile = profileSnapshot.exists() ? profileSnapshot.data() : null;
+          }
+          const senderEmail = latest.senderEmail || senderProfile?.email || '';
+          return product ? { latest: { ...latest, senderName: latest.senderName || senderProfile?.displayName || senderEmail.split('@')[0], senderEmail, senderPhotoUrl: latest.senderPhotoUrl || senderProfile?.photoURL }, product } : null;
+        } catch(error) {
+          console.warn('Skipping unavailable chat record:', error);
+          return null;
         }
-        let senderProfile = null;
-        if(latest.senderUid){
-          const profileSnapshot = await getDoc(doc(db, 'users', latest.senderUid));
-          senderProfile = profileSnapshot.exists() ? profileSnapshot.data() : null;
-        }
-        const senderEmail = latest.senderEmail || senderProfile?.email || '';
-        return product ? { latest: { ...latest, senderName: latest.senderName || senderProfile?.displayName || senderEmail.split('@')[0], senderEmail, senderPhotoUrl: latest.senderPhotoUrl || senderProfile?.photoURL }, product } : null;
       }));
       const visible = conversations.filter(Boolean).sort((a, b) => (b.latest.createdAt?.seconds || 0) - (a.latest.createdAt?.seconds || 0));
       if(!visible.length){
@@ -1077,7 +1091,12 @@
           } catch(error) { showToast('ลบแชทไม่สำเร็จ: ' + error.message); }
         };
       });
-    }, error => { list.textContent = `โหลดกล่องแชทไม่ได้: ${error.message}`; });
+    }, error => {
+      inboxSettled = true;
+      clearTimeout(inboxTimeout);
+      console.error('Chat inbox error:', error);
+      list.innerHTML = `<div class="empty-state">โหลดกล่องแชทไม่ได้: ${escapeHtml(error.code || error.message || 'ไม่ทราบสาเหตุ')}</div>`;
+    });
   }
 
   document.getElementById('deleteProductBtn').onclick = async () => {
