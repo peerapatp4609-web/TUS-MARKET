@@ -1,0 +1,17 @@
+[build]
+  publish = "public"
+
+[[redirects]]
+  from = "/firestore.rules"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/firebase.json"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/tus-market"
+  to = "/tus-market.html"
+  status = 200

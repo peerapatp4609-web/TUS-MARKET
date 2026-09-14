@@ -1,0 +1,1321 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TUS Market — ตลาดนัดออนไลน์ในโรงเรียน</title>
+
+<!-- Speed Optimization & Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600;700&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #FFF7FB;
+    --bg-card: #FFFFFF;
+    --ink: #3B2940;
+    --ink-soft: #806A7B;
+    --line: #F0DCE7;
+
+    --mint: #DDF3EA;      --mint-deep: #3B8A70;
+    --peach: #FFE0D2;     --peach-deep: #D66A45;
+    --bubblegum: #FFD0E1; --bubblegum-deep: #C54B7A;
+    --lavender: #E9DDF5;  --lavender-deep: #8060A8;
+    --butter: #FFF0BA;    --butter-deep: #A07916;
+    --sky: #DDEFF7;       --sky-deep: #4C8BA6;
+
+    --radius-card: 12px;
+    --shadow-soft: 0 8px 24px -14px rgba(85,44,70,0.28);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+  html{ scroll-behavior:smooth; }
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Prompt', sans-serif;
+    font-weight:400;
+    line-height:1.6;
+  }
+  h1,h2,h3, .display{ font-family:'Mitr', sans-serif; margin:0; }
+  a{ color:inherit; text-decoration:none; }
+  button{ font-family:inherit; cursor:pointer; }
+  img,svg{ display:block; max-width:100%; }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
+    outline:3px solid rgba(197,75,122,0.3);
+    outline-offset:2px;
+  }
+
+  .wrap{ max-width:1180px; margin:0 auto; padding:0 24px; }
+  .section{ padding:64px 0; }
+
+  /* HEADER */
+  header{
+    position:sticky; top:0; z-index:40;
+    background:rgba(255,247,251,0.94);
+    -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+  }
+  .header-row{
+    display:flex; align-items:center; gap:16px;
+    padding:14px 0;
+  }
+  .logo{
+    display:flex; align-items:center; gap:9px;
+    font-size:1.3rem; font-weight:700; white-space:nowrap;
+  }
+  .logo-badge{
+    width:44px; height:44px; border-radius:10px;
+    background:var(--bg-card); color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.8rem; flex-shrink:0; overflow:hidden;
+    border:1px solid rgba(240,220,231,0.8);
+    box-shadow:0 4px 12px -8px rgba(85,44,70,0.4);
+  }
+  .logo-badge img{ width:92%; height:92%; object-fit:contain; transition:transform 0.2s ease; }
+  .logo:hover .logo-badge img{ transform:scale(1.04); }
+  .logo-name{ display:inline-flex; align-items:baseline; gap:3px; font-family:'Mitr', sans-serif; line-height:1; }
+  .logo-name .tus{ color:var(--bubblegum-deep); font-weight:700; letter-spacing:0.01em; }
+  .logo-name .market{ display:inline-flex; color:var(--ink); font-family:'Prompt', sans-serif; font-weight:600; letter-spacing:-0.01em; }
+  .logo-fallback{ display:none; }
+  .logo-badge img[src=""] + .logo-fallback{ display:inline; }
+  .logo-badge img:not([src=""]){ display:block; }
+  .logo-badge img:not([src=""]) + .logo-fallback{ display:none; }
+  .logo-badge img.logo-image-failed{ display:none; }
+  .logo-badge img.logo-image-failed + .logo-fallback{ display:inline; }
+  @media (max-width:600px){ .logo{ gap:7px; font-size:1.15rem; } .logo-badge{ width:38px; height:38px; } }
+  .header-search{
+    flex:1; max-width:380px; margin-left:auto;
+    position:relative;
+  }
+  .header-search input{
+    width:100%; padding:10px 16px 10px 40px;
+    border-radius:10px; border:1px solid var(--line);
+    background:var(--bg-card); color:var(--ink);
+    font-family:'Prompt',sans-serif; font-size:0.92rem;
+  }
+  .header-search input:focus{ border-color:var(--lavender-deep); outline:none; }
+  .header-search .icon{ position:absolute; left:14px; top:50%; transform:translateY(-50%); opacity:0.6; }
+
+  /* AUTH UI */
+  .auth-wrap{ display:flex; align-items:center; gap:10px; }
+  .user-profile{
+    display:none; align-items:center; gap:8px;
+    background:var(--bg-card); border:1px solid var(--line);
+    padding:4px 12px 4px 6px; border-radius:999px;
+  }
+  .user-profile img{ width:28px; height:28px; border-radius:50%; object-fit:cover; }
+  .user-profile .u-name{ font-size:0.85rem; font-weight:600; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+  .header-cta{
+    background:var(--bubblegum-deep); color:#fff; border:none;
+    padding:10px 18px; border-radius:9px;
+    font-size:0.9rem; font-weight:500; white-space:nowrap;
+  }
+  .header-cta:hover{ background:var(--ink); }
+  .login-btn{
+    background:var(--bg-card); color:var(--ink); border:1px solid var(--line);
+    padding:8px 16px; border-radius:9px; font-size:0.88rem; font-weight:600;
+    display:flex; align-items:center; gap:6px;
+  }
+  .login-btn:hover{ background:var(--butter); border-color:var(--butter-deep); }
+
+  .my-items-btn{
+    background:var(--lavender); color:var(--ink); border:1px solid var(--lavender-deep);
+    padding:8px 14px; border-radius:9px; font-size:0.88rem; font-weight:600;
+    display:none; align-items:center; gap:4px;
+  }
+  .my-items-btn:hover{ background:var(--lavender-deep); color:#fff; }
+
+  .sync-badge{
+    display:flex; align-items:center; gap:6px;
+    font-size:0.78rem; color:var(--ink-soft); white-space:nowrap;
+  }
+  .sync-dot{ width:8px; height:8px; border-radius:50%; background:#B9B0C2; flex-shrink:0; }
+  .sync-badge[data-state="online"] .sync-dot{ background:var(--mint-deep); }
+  .sync-badge[data-state="error"] .sync-dot{ background:var(--bubblegum-deep); }
+
+  /* HERO & SECTIONS */
+  .paper-bg{ background:linear-gradient(135deg, #FFF0F6 0%, #FFF7FB 58%, #FFF4DE 100%); }
+  .hero{ position:relative; overflow:hidden; padding:64px 0 76px; border-bottom:1px solid var(--line); }
+  .hero-grid{ display:grid; grid-template-columns:1.1fr 0.9fr; gap:40px; align-items:center; }
+  .hero-tag{ display:inline-flex; align-items:center; gap:8px; background:var(--bubblegum); color:var(--bubblegum-deep); padding:6px 12px; border-radius:6px; font-size:0.85rem; font-weight:600; }
+  .hero h1{ font-size:clamp(2.1rem, 4.6vw, 3.3rem); font-weight:700; line-height:1.15; margin:18px 0 16px; }
+  .hero h1 .hl{ background:linear-gradient(180deg, transparent 60%, var(--peach) 60%); }
+  .hero p{ color:var(--ink-soft); font-size:1.05rem; max-width:46ch; margin-bottom:26px; }
+  .hero-search{ display:flex; gap:10px; max-width:460px; }
+  .hero-search input{ flex:1; padding:14px 18px; border-radius:9px; border:1px solid var(--line); background:var(--bg-card); font-family:'Prompt',sans-serif; font-size:0.98rem; color:var(--ink); }
+  .hero-search button{ background:var(--bubblegum-deep); color:#fff; border:none; padding:0 24px; border-radius:9px; font-weight:600; font-size:0.98rem; }
+
+  .hero-board{ position:relative; height:340px; }
+  .pin-note{ position:absolute; background:var(--bg-card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; box-shadow:var(--shadow-soft); font-size:0.85rem; font-weight:500; width:170px; }
+  .pin-note::before{ content:""; position:absolute; top:-10px; left:24px; width:22px; height:12px; border-radius:3px; background:var(--lavender); transform:rotate(-8deg); }
+  .pn1{ top:6px; left:0; }
+  .pn2{ top:96px; left:190px; background:var(--mint); }
+  .pn3{ top:210px; left:30px; background:var(--bubblegum); }
+
+  /* CATEGORY CHIPS */
+  .chip-row{ display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:10px; padding:4px 0 24px; }
+  .chip{ min-width:0; display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:8px 10px; border-radius:8px; border:1px solid var(--line); font-size:0.84rem; font-weight:500; color:var(--ink); background:var(--bg-card); box-shadow:none; transition:0.2s; }
+  .chip-icon{ flex:0 0 auto; width:22px; text-align:center; font-size:1rem; line-height:1; }
+  .chip.active{ background:var(--bubblegum-deep); color:#fff; border-color:var(--bubblegum-deep); }
+  .inbox-thread{ position:relative; }
+  .inbox-thread img{ position:absolute; left:10px; top:10px; }
+  .chat-inbox-btn{ position:relative; width:42px; height:42px; padding:0; border-radius:50%; display:grid; place-items:center; }
+  .chat-badge{ position:absolute; top:-5px; right:-5px; min-width:20px; height:20px; padding:0 5px; border-radius:999px; display:grid; place-items:center; background:var(--peach-deep); color:#fff; font-size:0.7rem; font-weight:700; border:2px solid var(--bg-card); }
+  @media (max-width:900px){ .chip-row{ grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+  @media (max-width:600px){ .chip-row{ grid-template-columns:repeat(2, minmax(0, 1fr)); } .chip{ justify-content:flex-start; } }
+
+  /* PRODUCT CARDS */
+  .section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:22px; }
+  .product-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:20px; }
+  .product-grid.is-loading{ display:grid; }
+  .loading-card, .empty-state{
+    grid-column:1 / -1; min-height:220px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:32px;
+    border:1px dashed var(--line); border-radius:var(--radius-card); background:var(--bg-card);
+    color:var(--ink-soft);
+  }
+  .loading-card::before{
+    content:""; width:32px; height:32px; border:3px solid var(--line);
+    border-top-color:var(--bubblegum-deep); border-radius:50%; animation:spin 0.8s linear infinite;
+    margin-bottom:14px;
+  }
+  .empty-state strong{ color:var(--ink); font-family:'Mitr',sans-serif; font-size:1.15rem; margin-bottom:6px; }
+  .empty-state p{ max-width:38ch; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  
+  .product-card{
+    position:relative; background:var(--bg-card);
+    border-radius:var(--radius-card); padding:16px;
+    border:1px solid var(--line); box-shadow:var(--shadow-soft); transition:transform 0.18s ease, box-shadow 0.18s ease;
+    display:flex; flex-direction:column;
+  }
+  .product-card:hover{ transform:translateY(-4px); box-shadow:0 14px 28px -16px rgba(85,44,70,0.4); }
+
+  .product-thumb{
+    width:100%; height:140px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:2.8rem; margin-bottom:12px; overflow:hidden; background:var(--bg);
+  }
+  .product-thumb img{ width:100%; height:100%; object-fit:cover; }
+  .product-card h3{ font-size:1rem; font-weight:600; margin-bottom:4px; line-height:1.3; }
+  .product-desc-snippet{
+    font-size:0.82rem; color:var(--ink-soft); margin-bottom:8px;
+    display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden; text-overflow:ellipsis; height:2.5em;
+  }
+  .product-price{ font-weight:700; font-size:1.05rem; color:var(--peach-deep); margin-top:auto; margin-bottom:8px; }
+  .product-seller{ display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--ink-soft); margin-bottom:12px; }
+  .contact-btn{ width:100%; border:none; border-radius:8px; padding:9px 0; font-size:0.86rem; font-weight:600; background:var(--ink); color:#fff; }
+  .contact-btn:hover{ opacity:0.9; }
+  .meta{ color:var(--ink-soft); font-size:0.85rem; }
+
+
+  /* MODALS */
+  .modal-backdrop{
+    position:fixed; inset:0; z-index:100;
+    background:rgba(59,41,64,0.5); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px);
+    display:none; align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    background:var(--bg-card); border-radius:14px;
+    max-width:440px; width:100%; max-height:88vh;
+    overflow-y:auto; padding:24px; position:relative;
+    box-shadow:0 24px 50px -18px rgba(85,44,70,0.42);
+    box-sizing:border-box;
+  }
+  .modal-close{
+    position:absolute; top:14px; right:14px;
+    background:var(--line); border:none; width:30px; height:30px;
+    border-radius:50%; font-size:0.95rem; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+
+  /* FORMS & INPUTS */
+  .add-form{ display:flex; flex-direction:column; gap:12px; width:100%; }
+  .field{ display:flex; flex-direction:column; gap:4px; font-size:0.85rem; color:var(--ink-soft); width:100%; }
+  .field input, .field select, .field textarea{
+    width:100%; padding:9px 12px; border-radius:12px;
+    border:1px solid var(--line); background:var(--bg);
+    color:var(--ink); font-family:'Prompt',sans-serif; font-size:0.9rem;
+    box-sizing:border-box;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    border-color:var(--lavender-deep); outline:none;
+  }
+  .field textarea{ resize:vertical; min-height:60px; }
+
+  .field-row{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px; width:100%;
+  }
+
+  .submit-btn{
+    border:none; border-radius:9px; padding:12px 0;
+    background:var(--bubblegum-deep); color:#fff; font-weight:600;
+    font-size:0.95rem; margin-top:6px; width:100%;
+  }
+  .submit-btn:hover{ background:var(--ink); }
+
+  .action-btns{ display:flex; gap:8px; margin-top:16px; }
+  .edit-btn{
+    border:none; border-radius:12px; padding:10px;
+    background:var(--butter-deep); color:#fff; font-weight:600;
+    font-size:0.85rem; flex:1;
+  }
+  .edit-btn:hover{ opacity:0.9; }
+
+  .delete-btn{
+    border:none; border-radius:12px; padding:10px;
+    background:var(--bubblegum-deep); color:#fff; font-weight:600;
+    font-size:0.85rem; flex:1;
+  }
+  .delete-btn:hover{ opacity:0.9; }
+
+  #previewImgWrap, #editPreviewImgWrap{ display:none; margin-top:4px; border-radius:12px; overflow:hidden; }
+  #previewImg, #editPreviewImg{ width:100%; max-height:140px; object-fit:cover; border-radius:12px; border:2px dashed var(--line); }
+
+  .toast{
+    position:fixed; bottom:26px; left:50%; z-index:200;
+    background:var(--ink); color:#fff; padding:12px 22px; border-radius:999px;
+    font-size:0.88rem; transform:translate(-50%, 20px); opacity:0;
+    pointer-events:none; transition:0.25s; text-align:center; max-width:90%;
+    box-shadow:var(--shadow-soft);
+  }
+  .toast.show{ opacity:1; transform:translate(-50%, 0); }
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+  /* RESPONSIVE */
+  @media (max-width:920px){
+    .hero-grid{ grid-template-columns:1fr; }
+    .hero-board{ height:200px; }
+    .product-grid{ grid-template-columns:repeat(2,1fr); gap:14px; }
+  }
+  @media (max-width:480px){
+    .header-search{ display:none; }
+    .header-row{ gap:8px; padding:10px 0; }
+    .logo{ font-size:1.1rem; }
+    .logo > span:last-child{ display:none; }
+    .sync-badge{ display:none; }
+    .auth-wrap{ gap:6px; }
+    .login-btn, .header-cta{ padding:8px 10px; font-size:0.78rem; }
+    .hero{ padding:48px 0 56px; }
+    .hero-board{ width:100%; }
+    .pin-note{ width:150px; padding:12px; }
+    .pn2{ left:auto; right:0; }
+    .pn3{ top:210px; left:18px; }
+    .field-row{ grid-template-columns:1fr; }
+    .modal{ padding:18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-row">
+    <div class="logo">
+      <span class="logo-badge">
+        <img src="assets/tus-logo.png" alt="ตราสัญลักษณ์ TUS" onerror="this.classList.add('logo-image-failed')">
+        <span class="logo-fallback" aria-hidden="true">TUS</span>
+      </span>
+      <span class="logo-name"><span class="tus">TUS</span><span class="market" aria-label="Market"><span>M</span><span>a</span><span>r</span><span>k</span><span>e</span><span>t</span></span></span>
+    </div>
+    <div class="header-search">
+      <span class="icon" aria-hidden="true">⌕</span>
+      <input id="topSearch" type="text" placeholder="ค้นหาของที่อยากได้...">
+    </div>
+    <span class="sync-badge" id="syncBadge" data-state="loading">
+      <span class="sync-dot"></span><span id="syncText">กำลังโหลด...</span>
+    </span>
+    <div class="auth-wrap">
+      <button class="login-btn" id="loginBtn"><span aria-hidden="true">↪</span> เข้าสู่ระบบ</button>
+      <button class="my-items-btn" id="myItemsBtn"><span aria-hidden="true">▣</span> สินค้าของฉัน</button>
+      <div class="user-profile" id="userProfile">
+        <img id="userAvatar" src="" alt="Avatar">
+        <span class="u-name" id="userName"></span>
+        <button id="logoutBtn" style="border:none;background:none;font-size:0.75rem;color:var(--bubblegum-deep);cursor:pointer;">[ออก]</button>
+      </div>
+      <button class="header-cta chat-inbox-btn" id="chatInboxBtn" style="display:none;background:var(--lavender-deep);" aria-label="เปิดกล่องแชท" title="เปิดกล่องแชท"><span aria-hidden="true">💬</span><span class="chat-badge" id="chatBadge" hidden>0</span></button>
+      <button class="header-cta" id="sellBtn">+ ลงขายสินค้า</button>
+      <button class="header-cta" id="adminBtn" style="display:none;background:var(--butter-deep);">แอดมิน</button>
+    </div>
+  </div>
+</header>
+
+<section class="hero paper-bg">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="hero-tag">ตลาดนัดของนักเรียน TUS</span>
+      <h1>ซื้อขายแลกเปลี่ยนกัน<br>ในรั้วโรงเรียนของเรา<span class="hl"></span></h1>
+      <p>ของกิน เครื่องเขียน เสื้อผ้ามือสอง ไปจนถึงชีทสรุปจากรุ่นพี่ — ค้นหาแล้วนัดรับกันได้เลยที่โรงเรียน</p>
+      <form class="hero-search" id="heroSearchForm">
+        <input id="heroSearch" type="text" placeholder="ลองค้นหา เช่น 'คุกกี้' หรือ 'ชีทเคมี'">
+        <button type="submit">ค้นหา</button>
+      </form>
+    </div>
+    <div class="hero-board">
+      <div class="pin-note pn1">ของมือสองสภาพดี 90%+</div>
+      <div class="pin-note pn2">แลกเปลี่ยนกันก็ได้นะ</div>
+      <div class="pin-note pn3">นัดรับที่โรงเรียนปลอดภัยสุด</div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding:12px 0;">
+  <div class="wrap">
+    <div class="chip-row" id="chipRow"></div>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0;">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="sectionTitle">สินค้าทั้งหมด</h2>
+      <span class="meta" id="resultCount"></span>
+    </div>
+    <div class="product-grid is-loading" id="productGrid">
+      <div class="loading-card" role="status">กำลังโหลดสินค้า...</div>
+    </div>
+  </div>
+</section>
+
+<!-- Detail & Contact Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalItemName">
+    <button class="modal-close" id="modalClose" aria-label="ปิดหน้าต่าง">✕</button>
+    <div id="modalImageWrap" style="display:none; margin-bottom:12px;">
+      <img id="modalImage" src="" style="width:100%; max-height:200px; object-fit:cover; border-radius:14px;">
+    </div>
+    <h3 id="modalSellerName"></h3>
+    <div style="color:var(--peach-deep);font-weight:700;font-size:1.1rem;margin:4px 0;" id="modalItemName"></div>
+    <div id="modalCreatedAt" style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;"></div>
+    <div id="modalDesc" style="font-size:0.88rem;color:var(--ink-soft);background:var(--bg);padding:10px;border-radius:10px;margin-bottom:12px;display:none;"></div>
+    <p style="margin:4px 0;">ห้อง / ชั้น: <strong id="modalRoom"></strong></p>
+    <button class="submit-btn" id="openChatBtn" type="button" style="margin-top:12px;">💬 แชทกับผู้ขาย</button>
+    
+    <div class="action-btns" id="ownerActions" style="display:none;">
+      <button class="edit-btn" id="editProductBtn">✏️ แก้ไขข้อมูล</button>
+      <button class="delete-btn" id="deleteProductBtn">🗑️ ลบสินค้านี้</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal-backdrop" id="addModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
+    <button class="modal-close" id="addModalClose" aria-label="ปิดหน้าต่าง">✕</button>
+    <h3 id="addModalTitle" style="margin-bottom:12px;">ลงขายของชิ้นใหม่</h3>
+    <form class="add-form" id="addProductForm">
+      <label class="field"><span>ชื่อสินค้า</span><input type="text" name="name" required placeholder="เช่น ชานมไข่มุก, ชีทชีวะ"></label>
+      <div class="field-row">
+        <label class="field"><span>ราคา (บาท)</span><input type="number" name="price" required placeholder="0"></label>
+        <label class="field"><span>หมวดหมู่</span><select name="cat" id="addCatSelect"></select></label>
+      </div>
+      <label class="field">
+        <span>รายละเอียดอื่นๆ (ไม่ใส่ก็ได้)</span>
+        <textarea name="desc" placeholder="เช่น สภาพ 95%, นัดรับได้ที่ตึก 3 ช่วงพักเที่ยง"></textarea>
+      </label>
+      <div class="field-row">
+        <label class="field"><span>ชื่อผู้ขาย</span><input type="text" name="seller" id="sellerInput" required></label>
+        <label class="field"><span>ห้อง/ชั้น</span><input type="text" name="room" required placeholder="ม.6/3"></label>
+      </div>
+      <label class="field">
+        <span>รูปภาพสินค้า</span>
+        <input type="file" id="imageInput" accept="image/*">
+      </label>
+      <div id="previewImgWrap">
+        <img id="previewImg" src="" alt="ตัวอย่างรูปภาพ">
+      </div>
+      <button type="submit" class="submit-btn">เพิ่มสินค้าลงตลาดนัด</button>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Product Modal -->
+<div class="modal-backdrop" id="editModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editModalTitle">
+    <button class="modal-close" id="editModalClose" aria-label="ปิดหน้าต่าง">✕</button>
+    <h3 id="editModalTitle" style="margin-bottom:12px;">แก้ไขข้อมูลสินค้า</h3>
+    <form class="add-form" id="editProductForm">
+      <label class="field"><span>ชื่อสินค้า</span><input type="text" name="name" id="editName" required></label>
+      <div class="field-row">
+        <label class="field"><span>ราคา (บาท)</span><input type="number" name="price" id="editPrice" required></label>
+        <label class="field"><span>หมวดหมู่</span><select name="cat" id="editCatSelect"></select></label>
+      </div>
+      <label class="field">
+        <span>รายละเอียดอื่นๆ</span>
+        <textarea name="desc" id="editDesc"></textarea>
+      </label>
+      <div class="field-row">
+        <label class="field"><span>ชื่อผู้ขาย</span><input type="text" name="seller" id="editSeller" required></label>
+        <label class="field"><span>ห้อง/ชั้น</span><input type="text" name="room" id="editRoom" required></label>
+      </div>
+      <label class="field">
+        <span>เปลี่ยนรูปภาพสินค้า (อัปโหลดเพื่อเปลี่ยน)</span>
+        <input type="file" id="editImageInput" accept="image/*">
+      </label>
+      <div id="editPreviewImgWrap">
+        <img id="editPreviewImg" src="" alt="รูปสินค้าปัจจุบัน">
+      </div>
+      <button type="submit" class="submit-btn" style="background:var(--butter-deep);">บันทึกการแก้ไข</button>
+    </form>
+  </div>
+</div>
+
+<!-- Product chat modal -->
+<div class="modal-backdrop" id="chatModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chatModalTitle">
+    <button class="modal-close" id="chatModalClose" aria-label="ปิดแชท">✕</button>
+    <h3 id="chatModalTitle" style="margin-bottom:12px;">แชทกับผู้ขาย</h3>
+    <div id="chatProductSummary" style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--bg);border-radius:10px;margin-bottom:10px;"></div>
+    <div id="chatMessages" style="height:260px;overflow-y:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;"></div>
+    <form id="chatForm" style="display:flex;gap:8px;">
+      <input id="chatInput" type="text" maxlength="500" required placeholder="พิมพ์ข้อความ..." style="flex:1;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg-card);font:inherit;">
+      <button class="submit-btn" type="submit">ส่ง</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="inboxModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="inboxModalTitle">
+    <button class="modal-close" id="inboxModalClose" aria-label="ปิดกล่องแชท">✕</button>
+    <h3 id="inboxModalTitle" style="margin-bottom:12px;">กล่องแชท</h3>
+    <div id="chatInboxList" class="empty-state">กำลังโหลดบทสนทนา...</div>
+  </div>
+</div>
+
+<!-- Admin Approval Modal -->
+<div class="modal-backdrop" id="adminModalBackdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
+    <button class="modal-close" id="adminModalClose" aria-label="ปิดหน้าต่าง">✕</button>
+    <h3 id="adminModalTitle" style="margin-bottom:12px;">อนุมัติสินค้า</h3>
+    <div id="adminLoginPanel">
+      <form class="add-form" id="adminLoginForm">
+        <label class="field"><span>Username</span><input id="adminUsername" required autocomplete="username"></label>
+        <label class="field"><span>Password</span><input id="adminPassword" type="password" required autocomplete="current-password"></label>
+        <button type="submit" class="submit-btn">เข้าสู่ระบบแอดมิน</button>
+      </form>
+    </div>
+    <div id="adminPanel" style="display:none;">
+      <button type="button" class="submit-btn" id="approveAllBtn" style="margin-bottom:12px;">อนุมัติทั้งหมด</button>
+      <div id="pendingProducts" class="empty-state">กำลังโหลดรายการรออนุมัติ...</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase Modular SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, onSnapshot, orderBy, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getAuth, signInWithPopup, signInWithEmailAndPassword, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCF9gXVh2T53sWcIl4udgVtGC9FrLNvOW4",
+    authDomain: "tus-market.firebaseapp.com",
+    projectId: "tus-market",
+    storageBucket: "tus-market.firebasestorage.app",
+    messagingSenderId: "988582645299",
+    appId: "1:988582645299:web:78c06fb2af7808be661d46"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
+  const adminEmail = '11076@triamudomsouth.ac.th';
+  const isAdminUser = () => currentUser?.email?.toLowerCase() === adminEmail.toLowerCase();
+
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  const productsRef = collection(db, 'products');
+  const messagesRef = collection(db, 'messages');
+  const usersRef = collection(db, 'users');
+
+  let currentUser = null;
+  let PRODUCTS = [];
+  let state = { category:'all', search:'', myItemsOnly: false };
+  let pendingImageData = null;
+  let editImageData = null;
+  let selectedProductId = null;
+  let productsLoaded = false;
+  let adminUnsubscribe = null;
+  let chatUnsubscribe = null;
+  let inboxUnsubscribe = null;
+  let notificationUnsubscribe = null;
+  let chatProduct = null;
+  let chatConversationId = null;
+
+  // หมวดหมู่สินค้าสำหรับตลาดนักเรียน
+  const CATEGORIES = [
+    { id:'all', name:'ทั้งหมด', icon:'🛍️' },
+    { id:'food', name:'อาหาร & ขนม', icon:'🍩' },
+    { id:'stationery', name:'เครื่องเขียน', icon:'✏️' },
+    { id:'books', name:'หนังสือ & การเรียน', icon:'📚' },
+    { id:'electronics', name:'อิเล็กทรอนิกส์', icon:'💻' },
+    { id:'fashion', name:'เสื้อผ้า รองเท้า & กระเป๋า', icon:'👕' },
+    { id:'beauty', name:'ความงาม & เครื่องประดับ', icon:'💄' },
+    { id:'sports', name:'อุปกรณ์กีฬา', icon:'⚽' },
+    { id:'games', name:'เกม & ของเล่น', icon:'🎮' },
+    { id:'collectibles', name:'ของสะสม & ไอดอล', icon:'⭐' },
+    { id:'dorm', name:'ของใช้ทั่วไป', icon:'🏠' },
+    { id:'tickets', name:'บัตรกิจกรรม', icon:'🎟️' },
+    { id:'handmade', name:'งานแฮนด์เมด', icon:'🧶' },
+    { id:'services', name:'บริการ & รับทำงาน', icon:'🛠️' },
+    { id:'other', name:'อื่นๆ', icon:'📦' }
+  ];
+
+  const catMap = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
+  catMap.drink = catMap.food;
+  catMap.dessert = catMap.food;
+  catMap.tech = catMap.electronics;
+  catMap.gadgets = catMap.electronics;
+  catMap.uniform = catMap.fashion;
+  catMap.bags = catMap.fashion;
+  catMap.shoes = catMap.fashion;
+  catMap.clothes = catMap.fashion;
+  catMap.idol = catMap.collectibles;
+
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const userProfile = document.getElementById('userProfile');
+  const myItemsBtn = document.getElementById('myItemsBtn');
+  const adminBtn = document.getElementById('adminBtn');
+  const chatInboxBtn = document.getElementById('chatInboxBtn');
+
+  function getReadChats(){
+    try { return JSON.parse(localStorage.getItem(`tusChatRead_${currentUser?.uid}`) || '{}'); } catch { return {}; }
+  }
+
+  function getNotificationStart(){
+    return Number(localStorage.getItem(`tusChatSession_${currentUser?.uid}`) || 0);
+  }
+
+  function markChatRead(conversationId){
+    const read = getReadChats();
+    read[conversationId] = Math.floor(Date.now() / 1000);
+    localStorage.setItem(`tusChatRead_${currentUser.uid}`, JSON.stringify(read));
+    subscribeChatNotifications();
+  }
+
+  function updateChatNotification(people, messages){
+    const badge = document.getElementById('chatBadge');
+    badge.textContent = people > 99 ? '99+' : String(people);
+    badge.hidden = people === 0;
+    chatInboxBtn.setAttribute('aria-label', messages ? `มีข้อความใหม่จาก ${people} คน รวม ${messages} ข้อความ` : 'เปิดกล่องแชท');
+    chatInboxBtn.title = messages ? `มีข้อความใหม่จาก ${people} คน รวม ${messages} ข้อความ` : 'เปิดกล่องแชท';
+  }
+
+  function subscribeChatNotifications(){
+    if(notificationUnsubscribe) notificationUnsubscribe();
+    if(!currentUser) return;
+    const notificationQuery = query(messagesRef, where('participantUids', 'array-contains', currentUser.uid));
+    notificationUnsubscribe = onSnapshot(notificationQuery, snapshot => {
+      const read = getReadChats();
+      const unreadPeople = new Set();
+      let unreadMessages = 0;
+      snapshot.docs.forEach(item => {
+        const message = item.data();
+        const createdSeconds = message.createdAt?.seconds || 0;
+        const lastRead = Math.max(read[message.conversationId] || 0, getNotificationStart());
+        if(message.senderUid !== currentUser.uid && createdSeconds > lastRead){
+          unreadMessages += 1;
+          unreadPeople.add(message.senderUid);
+        }
+      });
+      updateChatNotification(unreadPeople.size, unreadMessages);
+    });
+  }
+
+  function escapeHtml(value){
+    return String(value ?? '').replace(/[&<>'"]/g, char => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+    }[char]));
+  }
+
+  function formatPostedAt(timestamp){
+    if(!timestamp) return 'ไม่ทราบเวลาโพสต์';
+    const date = typeof timestamp.toDate === 'function'
+      ? timestamp.toDate()
+      : new Date((timestamp.seconds || 0) * 1000);
+    if(Number.isNaN(date.getTime())) return 'ไม่ทราบเวลาโพสต์';
+    return `โพสต์เมื่อ ${date.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'numeric' })} เวลา ${date.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' })} น.`;
+  }
+
+  function showChatProductSummary(product){
+    const image = product.image ? `<img src="${escapeHtml(product.image)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';" style="width:52px;height:52px;object-fit:cover;border-radius:8px;"><span style="display:none;width:52px;height:52px;place-items:center;font-size:1.6rem;">📦</span>` : '<span style="display:grid;width:52px;height:52px;place-items:center;font-size:1.6rem;">📦</span>';
+    document.getElementById('chatProductSummary').innerHTML = `${image}<span><strong style="display:block;">${escapeHtml(product.name)}</strong><span class="meta">${escapeHtml(product.price)} บาท</span></span>`;
+  }
+
+  async function hashPin(pin){
+    const data = new TextEncoder().encode(pin);
+    const buffer = await crypto.subtle.digest('SHA-256', data);
+    const hash = Array.from(new Uint8Array(buffer), byte => byte.toString(16).padStart(2, '0')).join('');
+    return `sha256:${hash}`;
+  }
+
+  async function verifyPin(pin, storedPin){
+    if(!storedPin) return false;
+    if(String(storedPin).startsWith('sha256:')) return (await hashPin(pin)) === storedPin;
+    return pin === storedPin;
+  }
+
+  loginBtn.onclick = async () => {
+    if (window.location.protocol === 'file:') {
+      alert("⚠️ กรุณาเปิดผ่าน Live Server (http://localhost/...) หรืออัปโหลดขึ้น Web Server ครับ");
+      return;
+    }
+    try {
+      showToast("กำลังเปิดหน้าต่างล็อกอิน...");
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      if (error.code === 'auth/unauthorized-domain') {
+        const host = window.location.hostname || 'โดเมนปัจจุบัน';
+        alert(`❌ Firebase ยังไม่ได้อนุญาตโดเมน: "${host}"\n\nไปที่ Firebase Console -> Authentication -> Settings -> Authorized domains แล้วเพิ่ม "${host}" ครับ`);
+      } else if (error.code !== 'auth/popup-closed-by-user') {
+        showToast(`ล็อกอินไม่สำเร็จ: ${error.message}`);
+      }
+    }
+  };
+
+  logoutBtn.onclick = () => {
+    state.myItemsOnly = false;
+    signOut(auth);
+  };
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const email = user.email || "";
+      if (!email.endsWith("@triamudomsouth.ac.th")) {
+        await signOut(auth);
+        alert("❌ อนุญาตเฉพาะอีเมลโรงเรียน (@triamudomsouth.ac.th) เท่านั้นครับ");
+        return;
+      }
+      currentUser = user;
+      localStorage.setItem(`tusChatSession_${user.uid}`, String(Math.floor(Date.now() / 1000)));
+      await setDoc(doc(db, 'users', user.uid), {
+        displayName: user.displayName || user.email || 'ผู้ใช้โรงเรียน',
+        email: user.email || '',
+        photoURL: user.photoURL || ''
+      }, { merge: true });
+      loginBtn.style.display = 'none';
+      userProfile.style.display = 'flex';
+      myItemsBtn.style.display = 'flex';
+      chatInboxBtn.style.display = 'block';
+      document.getElementById('userName').textContent = user.displayName ? user.displayName.split(' ')[0] : 'ผู้ใช้';
+      document.getElementById('userAvatar').src = user.photoURL || 'https://via.placeholder.com/28';
+      document.getElementById('sellerInput').value = user.displayName ? user.displayName.split(' ')[0] : '';
+      adminBtn.style.display = email.toLowerCase() === adminEmail ? 'block' : 'none';
+      subscribeChatNotifications();
+    } else {
+      currentUser = null;
+      loginBtn.style.display = 'flex';
+      userProfile.style.display = 'none';
+      myItemsBtn.style.display = 'none';
+      chatInboxBtn.style.display = 'none';
+      state.myItemsOnly = false;
+      renderGrid();
+      adminBtn.style.display = 'none';
+      if(notificationUnsubscribe) notificationUnsubscribe();
+      updateChatNotification(0, 0);
+    }
+  });
+
+  myItemsBtn.onclick = () => {
+    state.myItemsOnly = !state.myItemsOnly;
+    if (state.myItemsOnly) {
+      myItemsBtn.style.background = 'var(--lavender-deep)';
+      myItemsBtn.style.color = '#fff';
+      document.getElementById('sectionTitle').textContent = 'สินค้าของฉัน';
+    } else {
+      myItemsBtn.style.background = 'var(--lavender)';
+      myItemsBtn.style.color = 'var(--ink)';
+      document.getElementById('sectionTitle').textContent = 'สินค้าทั้งหมด';
+    }
+    renderGrid();
+  };
+
+  function resizeImage(file, maxDim=450, quality=0.68){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onerror = ()=> reject(reader.error);
+      reader.onload = ()=>{
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = ()=>{
+          let { width, height } = img;
+          if(width > height){
+            if(width > maxDim){ height = Math.round(height * maxDim / width); width = maxDim; }
+          }else{
+            if(height > maxDim){ width = Math.round(width * maxDim / height); height = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.getElementById('imageInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(file){
+      try{
+        pendingImageData = await resizeImage(file);
+        const img = document.getElementById('previewImg');
+        img.src = pendingImageData;
+        document.getElementById('previewImgWrap').style.display = 'block';
+      }catch(err){
+        showToast('ไม่สามารถประมวลผลรูปภาพได้');
+      }
+    }
+  });
+
+  document.getElementById('editImageInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(file){
+      try{
+        editImageData = await resizeImage(file);
+        const img = document.getElementById('editPreviewImg');
+        img.src = editImageData;
+        document.getElementById('editPreviewImgWrap').style.display = 'block';
+      }catch(err){
+        showToast('ไม่สามารถประมวลผลรูปภาพได้');
+      }
+    }
+  });
+
+  function subscribeProducts(){
+    renderChips();
+    const q = query(productsRef, where('approved', '==', true));
+    const loadingTimeout = setTimeout(() => {
+      if(productsLoaded) return;
+      productsLoaded = true;
+      const syncBadge = document.getElementById('syncBadge');
+      const syncText = document.getElementById('syncText');
+      syncBadge.dataset.state = 'error';
+      syncText.textContent = 'เชื่อมต่อไม่ได้';
+      renderGrid('การเชื่อมต่อใช้เวลานานเกินไป กรุณาตรวจสอบ Firestore และลองรีเฟรชหน้าเว็บ');
+    }, 8000);
+    
+    onSnapshot(q, (snapshot)=>{
+      clearTimeout(loadingTimeout);
+      PRODUCTS = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      productsLoaded = true;
+      const syncBadge = document.getElementById('syncBadge');
+      const syncText = document.getElementById('syncText');
+      
+      syncBadge.dataset.state = 'online';
+      syncText.textContent = 'ออนไลน์';
+      renderGrid();
+    }, (error) => {
+      clearTimeout(loadingTimeout);
+      console.error("Firestore error: ", error);
+      const syncBadge = document.getElementById('syncBadge');
+      const syncText = document.getElementById('syncText');
+      syncBadge.dataset.state = 'error';
+      syncText.textContent = 'เชื่อมต่อไม่ได้';
+      productsLoaded = true;
+      renderGrid(`Firebase: ${error.code || 'unknown'} - ${error.message || 'ไม่ทราบสาเหตุ'}`);
+      showToast(`เชื่อมต่อ Firebase ไม่ได้: ${error.code || 'unknown'}`);
+    });
+  }
+
+  function renderGrid(errorMessage = ''){
+    const grid = document.getElementById('productGrid');
+    if(!productsLoaded){
+      grid.classList.add('is-loading');
+      grid.innerHTML = '<div class="loading-card" role="status">กำลังโหลดสินค้า...</div>';
+      return;
+    }
+    grid.classList.remove('is-loading');
+    const filtered = PRODUCTS.filter(p => {
+      const matchCat = state.category === 'all' || (catMap[p.cat]?.id === state.category);
+      const matchSearch = p.name ? p.name.toLowerCase().includes(state.search.toLowerCase()) : true;
+      const matchMyItems = state.myItemsOnly ? (currentUser && p.uid === currentUser.uid) : true;
+      return matchCat && matchSearch && matchMyItems;
+    });
+
+    if(errorMessage){
+      grid.innerHTML = `<div class="empty-state" role="alert"><strong>เกิดข้อผิดพลาด</strong><p>${escapeHtml(errorMessage)}</p></div>`;
+    } else if(!filtered.length){
+      const hasFilter = state.search || state.category !== 'all' || state.myItemsOnly;
+      grid.innerHTML = `<div class="empty-state"><strong>${hasFilter ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้าวางขาย'}</strong><p>${hasFilter ? 'ลองเปลี่ยนคำค้นหาหรือเลือกหมวดหมู่อื่น' : 'เริ่มต้นตลาดนัดด้วยการลงขายสินค้าชิ้นแรกของคุณ'}</p></div>`;
+    } else {
+      grid.innerHTML = filtered.map(p => {
+      const c = catMap[p.cat] || catMap.other;
+      const thumb = p.image 
+        ? `<img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}">` 
+        : `<span aria-hidden="true">${c.icon}</span>`;
+      return `
+        <div class="product-card">
+          <div class="product-thumb">${thumb}</div>
+          <h3>${escapeHtml(p.name)}</h3>
+          <div class="product-desc-snippet">${escapeHtml(p.desc || 'ไม่มีรายละเอียดเพิ่มเติม')}</div>
+          <div class="product-price">${escapeHtml(p.price)} บาท</div>
+          <div class="product-seller"><span>${escapeHtml(p.seller)} (${escapeHtml(p.room)})</span></div>
+          <div class="meta">${escapeHtml(formatPostedAt(p.createdAt))}</div>
+          <button class="contact-btn" data-product-id="${escapeHtml(p.id)}">รายละเอียด / ติดต่อผู้ขาย</button>
+        </div>
+      `;
+      }).join('');
+      grid.querySelectorAll('[data-product-id]').forEach(button => {
+        button.addEventListener('click', () => openContact(button.dataset.productId));
+      });
+    }
+    document.getElementById('resultCount').textContent = `แสดง ${filtered.length} รายการ`;
+  }
+
+  function renderChips(){
+    document.getElementById('chipRow').innerHTML = CATEGORIES.map(c => `
+      <button class="chip ${state.category === c.id ? 'active' : ''}" onclick="filterCat('${c.id}')"><span class="chip-icon" aria-hidden="true">${c.icon}</span> ${c.name}</button>
+    `).join('');
+  }
+
+  window.filterCat = (id) => { 
+    state.category = id; 
+    renderChips();
+    renderGrid(); 
+  };
+  
+  const handleSearch = (val) => {
+    state.search = val.trim();
+    renderGrid();
+  };
+
+  document.getElementById('topSearch').addEventListener('input', (e) => handleSearch(e.target.value));
+  document.getElementById('heroSearchForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleSearch(document.getElementById('heroSearch').value);
+  });
+
+  window.openContact = (id) => {
+    const p = PRODUCTS.find(item => item.id === id);
+    if(!p) return;
+    
+    selectedProductId = id;
+
+    const imgWrap = document.getElementById('modalImageWrap');
+    const img = document.getElementById('modalImage');
+    if(p.image){
+      img.src = p.image;
+      imgWrap.style.display = 'block';
+    } else {
+      imgWrap.style.display = 'none';
+    }
+
+    document.getElementById('modalSellerName').textContent = `ผู้ขาย: ${p.seller}`;
+    document.getElementById('modalItemName').textContent = `${p.name} (${p.price} บาท)`;
+    document.getElementById('modalCreatedAt').textContent = formatPostedAt(p.createdAt);
+    
+    const descBox = document.getElementById('modalDesc');
+    if(p.desc){
+      descBox.textContent = `รายละเอียด: ${p.desc}`;
+      descBox.style.display = 'block';
+    } else {
+      descBox.style.display = 'none';
+    }
+
+    document.getElementById('modalRoom').textContent = p.room;
+
+    const ownerActions = document.getElementById('ownerActions');
+    if (currentUser && (p.uid === currentUser.uid || isAdminUser())) {
+      ownerActions.style.display = 'flex';
+    } else {
+      ownerActions.style.display = 'none';
+    }
+
+    document.getElementById('modalBackdrop').classList.add('open');
+  };
+
+  document.getElementById('openChatBtn').onclick = () => {
+    if(!currentUser){
+      showToast('กรุณาเข้าสู่ระบบก่อนเริ่มแชท');
+      return;
+    }
+    chatProduct = PRODUCTS.find(item => item.id === selectedProductId);
+    if(!chatProduct) return;
+    if(chatProduct.uid === currentUser.uid){
+      showToast('เปิดแชทจากรายการกล่องแชทเมื่อมีคนทักเข้ามา');
+      return;
+    }
+    chatConversationId = `${chatProduct.id}_${[chatProduct.uid, currentUser.uid].sort().join('_')}`;
+    markChatRead(chatConversationId);
+    document.getElementById('modalBackdrop').classList.remove('open');
+    document.getElementById('chatModalTitle').textContent = `แชท: ${chatProduct.name}`;
+    showChatProductSummary(chatProduct);
+    document.getElementById('chatModalBackdrop').classList.add('open');
+    loadChatMessages();
+  };
+
+  function loadChatMessages(){
+    const messages = document.getElementById('chatMessages');
+    if(chatUnsubscribe) chatUnsubscribe();
+    if(!currentUser || !chatConversationId){
+      messages.textContent = 'ไม่สามารถเปิดแชทนี้ได้';
+      return;
+    }
+    const chatQuery = query(messagesRef, where('participantUids', 'array-contains', currentUser.uid));
+    chatUnsubscribe = onSnapshot(chatQuery, snapshot => {
+      const items = snapshot.docs.map(item => ({ id:item.id, ...item.data() }))
+        .filter(item => item.conversationId === chatConversationId)
+        .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      items.forEach(item => {
+        if(!item.senderName && item.senderEmail) item.senderName = item.senderEmail.split('@')[0];
+      });
+      messages.innerHTML = items.length ? items.map(item => { const mine = item.senderUid === currentUser.uid; const name = item.senderName || 'ผู้ใช้โรงเรียน'; const email = item.senderEmail || (mine ? currentUser.email : 'อีเมลไม่พร้อมใช้งาน (ข้อความเก่า)'); const avatar = item.senderPhotoUrl ? `<img src="${escapeHtml(item.senderPhotoUrl)}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">` : '<span style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--lavender);">👤</span>'; return `<div style="display:flex;align-items:flex-end;gap:6px;justify-content:${mine ? 'flex-end' : 'flex-start'};margin:8px 0;">${mine ? '' : avatar}<div style="max-width:75%;text-align:${mine ? 'right' : 'left'};"><small class="meta">${escapeHtml(name)}<br>${escapeHtml(email)}</small><div style="padding:8px 10px;border-radius:10px;background:${mine ? 'var(--lavender)' : 'var(--bg-card)'};border:1px solid var(--line);">${escapeHtml(item.text)}</div></div>${mine ? avatar : ''}</div>`; }).join('') : '<div class="meta" style="text-align:center;padding:30px 0;">เริ่มการสนทนาได้เลย</div>';
+      messages.scrollTop = messages.scrollHeight;
+    }, error => {
+      console.error('Chat messages error:', error);
+      messages.innerHTML = `<div class="meta" style="text-align:center;padding:30px 0;">โหลดแชทไม่ได้ กรุณาปิดแล้วเปิดแชทใหม่</div>`;
+    });
+  }
+
+  document.getElementById('chatForm').onsubmit = async event => {
+    event.preventDefault();
+    const input = document.getElementById('chatInput');
+    const submitButton = event.target.querySelector('button[type="submit"]');
+    const text = input.value.trim();
+    if(!text || !chatProduct || !chatConversationId || !currentUser || submitButton?.disabled) return;
+    if(submitButton) submitButton.disabled = true;
+    try {
+      await addDoc(messagesRef, { conversationId: chatConversationId, productId: chatProduct.id, sellerUid: chatProduct.uid, senderUid: currentUser.uid, senderName: currentUser.displayName || currentUser.email || 'ผู้ใช้โรงเรียน', senderEmail: currentUser.email || '', senderPhotoUrl: currentUser.photoURL || '', participantUids: [chatProduct.uid, currentUser.uid], text, createdAt: serverTimestamp() });
+      input.value = '';
+    } catch(error) {
+      console.error('Send chat message error:', error);
+      showToast(`ส่งข้อความไม่สำเร็จ: ${error.code || error.message}`);
+    } finally {
+      if(submitButton) submitButton.disabled = false;
+    }
+  };
+
+  chatInboxBtn.onclick = () => {
+    if(!currentUser) return;
+    document.getElementById('inboxModalBackdrop').classList.add('open');
+    loadChatInbox();
+  };
+
+  async function loadChatInbox(){
+    const list = document.getElementById('chatInboxList');
+    if(inboxUnsubscribe) inboxUnsubscribe();
+    const inboxQuery = query(messagesRef, where('participantUids', 'array-contains', currentUser.uid));
+    inboxUnsubscribe = onSnapshot(inboxQuery, async snapshot => {
+      const grouped = new Map();
+      snapshot.docs.forEach(item => {
+        const message = { id:item.id, ...item.data() };
+        const previous = grouped.get(message.conversationId);
+        if(!previous || (message.createdAt?.seconds || 0) > (previous.createdAt?.seconds || 0)) grouped.set(message.conversationId, message);
+      });
+      const conversations = await Promise.all([...grouped.values()].map(async latest => {
+        let product = PRODUCTS.find(item => item.id === latest.productId);
+        if(!product){
+          const productSnapshot = await getDoc(doc(db, 'products', latest.productId));
+          product = productSnapshot.exists() ? { id:productSnapshot.id, ...productSnapshot.data() } : null;
+        }
+        let senderProfile = null;
+        if(latest.senderUid){
+          const profileSnapshot = await getDoc(doc(db, 'users', latest.senderUid));
+          senderProfile = profileSnapshot.exists() ? profileSnapshot.data() : null;
+        }
+        const senderEmail = latest.senderEmail || senderProfile?.email || '';
+        return product ? { latest: { ...latest, senderName: latest.senderName || senderProfile?.displayName || senderEmail.split('@')[0], senderEmail, senderPhotoUrl: latest.senderPhotoUrl || senderProfile?.photoURL }, product } : null;
+      }));
+      const visible = conversations.filter(Boolean).sort((a, b) => (b.latest.createdAt?.seconds || 0) - (a.latest.createdAt?.seconds || 0));
+      if(!visible.length){
+        list.innerHTML = '<div class="empty-state">ยังไม่มีข้อความเข้ามา</div>';
+        return;
+      }
+      list.className = '';
+      list.innerHTML = visible.map(({ latest, product }) => { const senderName = latest.senderName || 'ผู้ใช้โรงเรียน'; const senderEmail = latest.senderEmail || 'อีเมลไม่พร้อมใช้งาน (ข้อความเก่า)'; const senderAvatar = latest.senderPhotoUrl ? `<img src="${escapeHtml(latest.senderPhotoUrl)}" alt="" style="width:42px;height:42px;border-radius:50%;object-fit:cover;">` : '<span style="width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--lavender);font-size:1.2rem;">👤</span>'; return `<div class="inbox-thread" data-product-id="${escapeHtml(product.id)}" data-conversation-id="${escapeHtml(latest.conversationId)}" style="display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg-card);padding:10px;margin-bottom:8px;">${senderAvatar}<button class="inbox-open" data-product-id="${escapeHtml(product.id)}" data-conversation-id="${escapeHtml(latest.conversationId)}" style="flex:1;min-width:0;text-align:left;border:0;background:none;cursor:pointer;padding:0;"><strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(senderName)}</strong><span class="meta" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(senderEmail)}</span><span class="meta" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">ทักมาจาก: ${escapeHtml(product.name)}</span><span class="meta" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(product.price)} บาท · ${escapeHtml(latest.text)}</span></button><button class="inbox-delete" data-conversation-id="${escapeHtml(latest.conversationId)}" title="ลบแชท" style="border:0;background:none;color:var(--peach-deep);cursor:pointer;font-size:1.1rem;">🗑️</button></div>`; }).join('');
+      list.querySelectorAll('.inbox-open').forEach(button => {
+        button.onclick = () => {
+          chatProduct = PRODUCTS.find(item => item.id === button.dataset.productId) || visible.find(item => item.product.id === button.dataset.productId)?.product;
+          chatConversationId = button.dataset.conversationId;
+          markChatRead(chatConversationId);
+          if(!chatProduct) return;
+          document.getElementById('inboxModalBackdrop').classList.remove('open');
+          document.getElementById('chatModalTitle').textContent = `แชท: ${chatProduct.name}`;
+          showChatProductSummary(chatProduct);
+          document.getElementById('chatModalBackdrop').classList.add('open');
+          loadChatMessages();
+        };
+      });
+      list.querySelectorAll('.inbox-delete').forEach(button => {
+        button.onclick = async event => {
+          event.stopPropagation();
+          if(!window.confirm('ลบการสนทนานี้ใช่ไหม?')) return;
+          const docs = snapshot.docs.filter(item => item.data().conversationId === button.dataset.conversationId);
+          try {
+            await Promise.all(docs.map(item => deleteDoc(doc(db, 'messages', item.id))));
+            showToast('ลบแชทแล้ว');
+          } catch(error) { showToast('ลบแชทไม่สำเร็จ: ' + error.message); }
+        };
+      });
+    }, error => { list.textContent = `โหลดกล่องแชทไม่ได้: ${error.message}`; });
+  }
+
+  document.getElementById('deleteProductBtn').onclick = async () => {
+    const p = PRODUCTS.find(item => item.id === selectedProductId);
+    if(!p || !currentUser || (!isAdminUser() && p.uid !== currentUser.uid)) {
+      showToast('เฉพาะเจ้าของหรือผู้คุมเท่านั้นที่ลบได้');
+      return;
+    }
+
+    if(isAdminUser() || p.uid === currentUser.uid){
+      try {
+        showToast("กำลังลบสินค้า...");
+        await deleteDoc(doc(db, 'products', p.id));
+        document.getElementById('modalBackdrop').classList.remove('open');
+        showToast("ลบสินค้าเรียบร้อยแล้ว!");
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการลบสินค้า");
+      }
+    } else {
+      alert("❌ รหัส PIN ไม่ถูกต้อง!");
+    }
+  };
+
+  document.getElementById('editProductBtn').onclick = () => {
+    const p = PRODUCTS.find(item => item.id === selectedProductId);
+    if(!p || !currentUser || (!isAdminUser() && p.uid !== currentUser.uid)) {
+      showToast('เฉพาะเจ้าของหรือผู้คุมเท่านั้นที่แก้ไขได้');
+      return;
+    }
+
+    document.getElementById('editName').value = p.name || '';
+    document.getElementById('editPrice').value = p.price || '';
+    document.getElementById('editDesc').value = p.desc || '';
+    document.getElementById('editSeller').value = p.seller || '';
+    document.getElementById('editRoom').value = p.room || '';
+
+    const editSelect = document.getElementById('editCatSelect');
+    editSelect.innerHTML = CATEGORIES.filter(c=>c.id!=='all').map(c=>`<option value="${c.id}" ${c.id === p.cat ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
+
+    editImageData = null;
+    const previewWrap = document.getElementById('editPreviewImgWrap');
+    const previewImg = document.getElementById('editPreviewImg');
+    if (p.image) {
+      previewImg.src = p.image;
+      previewWrap.style.display = 'block';
+    } else {
+      previewWrap.style.display = 'none';
+    }
+
+    document.getElementById('modalBackdrop').classList.remove('open');
+    document.getElementById('editModalBackdrop').classList.add('open');
+  };
+
+  document.getElementById('editProductForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const p = PRODUCTS.find(item => item.id === selectedProductId);
+    if(!p || !currentUser || (!isAdminUser() && p.uid !== currentUser.uid)) {
+      showToast('เฉพาะเจ้าของหรือผู้คุมเท่านั้นที่แก้ไขได้');
+      return;
+    }
+
+    const fd = new FormData(e.target);
+    try {
+      showToast("กำลังบันทึกการแก้ไข...");
+      const updatedData = {
+        name: fd.get('name').trim(),
+        price: Number(fd.get('price')),
+        cat: fd.get('cat'),
+        desc: fd.get('desc') ? fd.get('desc').trim() : '',
+        seller: fd.get('seller').trim(),
+        room: fd.get('room').trim(),
+        line: p.line || '',
+      };
+
+      if (editImageData) {
+        updatedData.image = editImageData;
+      }
+
+      await updateDoc(doc(db, 'products', p.id), updatedData);
+      document.getElementById('editModalBackdrop').classList.remove('open');
+      showToast("แก้ไขข้อมูลสินค้าเรียบร้อย!");
+    } catch(err) {
+      console.error('Edit product error:', err);
+      showToast(`แก้ไขไม่สำเร็จ: ${err.code || err.message || 'กรุณาตรวจข้อมูล'}`);
+    }
+  };
+
+  function closeAllModals(){
+    document.querySelectorAll('.modal-backdrop.open').forEach(modal => modal.classList.remove('open'));
+  }
+
+  document.getElementById('modalClose').onclick = closeAllModals;
+  document.getElementById('chatModalClose').onclick = closeAllModals;
+  document.getElementById('inboxModalClose').onclick = closeAllModals;
+  document.getElementById('addModalClose').onclick = closeAllModals;
+  document.getElementById('editModalClose').onclick = closeAllModals;
+  document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+    backdrop.addEventListener('click', event => {
+      if(event.target === backdrop) closeAllModals();
+    });
+  });
+  document.addEventListener('keydown', event => {
+    if(event.key === 'Escape') closeAllModals();
+  });
+  
+  document.getElementById('sellBtn').onclick = () => {
+    if(!currentUser){
+      showToast("กรุณาล็อกอินด้วยอีเมลโรงเรียนก่อนลงขายสินค้า");
+      return;
+    }
+    const select = document.getElementById('addCatSelect');
+    select.innerHTML = CATEGORIES.filter(c=>c.id!=='all').map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+    document.getElementById('addProductForm').reset();
+    document.getElementById('previewImgWrap').style.display = 'none';
+    pendingImageData = null;
+    document.getElementById('addModalBackdrop').classList.add('open');
+  };
+
+  document.getElementById('addProductForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      showToast("กำลังลงขายสินค้า...");
+      await addDoc(productsRef, {
+        name: fd.get('name').trim(),
+        price: Number(fd.get('price')),
+        cat: fd.get('cat'),
+        desc: fd.get('desc') ? fd.get('desc').trim() : '',
+        seller: fd.get('seller').trim(),
+        room: fd.get('room').trim(),
+        line: '',
+        image: pendingImageData || null,
+        uid: currentUser.uid,
+        approved: false,
+        moderationStatus: 'pending_manual',
+        createdAt: serverTimestamp()
+      });
+      document.getElementById('addModalBackdrop').classList.remove('open');
+      showToast("ลงขายสำเร็จ!");
+    } catch(err) {
+      console.error('Add product error:', err);
+      showToast(`ลงขายไม่สำเร็จ: ${err.code || err.message || 'กรุณาตรวจข้อมูล'}`);
+    }
+  };
+
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=> t.classList.remove('show'), 3000);
+  }
+
+  async function loadPendingProducts(){
+    const list = document.getElementById('pendingProducts');
+    const pendingQuery = query(productsRef, where('approved', '==', false));
+    if(adminUnsubscribe) adminUnsubscribe();
+    adminUnsubscribe = onSnapshot(pendingQuery, snapshot => {
+      const pendingItems = snapshot.docs.map(item => {
+        const p = { id:item.id, ...item.data() };
+        return { ...p, createdAtSeconds: p.createdAt?.seconds || 0 };
+      }).filter(p => p.moderationStatus !== 'rejected')
+        .sort((a, b) => b.createdAtSeconds - a.createdAtSeconds);
+      if(!pendingItems.length){
+        list.innerHTML = '<div class="empty-state">ไม่มีสินค้ารออนุมัติ</div>';
+        return;
+      }
+      list.innerHTML = pendingItems.map(p => {
+        const image = p.image ? `<img src="${escapeHtml(p.image)}" alt="" style="width:84px;height:84px;object-fit:cover;border-radius:8px;">` : '';
+        return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;gap:12px;">
+          ${image}<div style="flex:1;min-width:0;"><strong>${escapeHtml(p.name)}</strong><div class="meta">${escapeHtml(p.seller)} · ${escapeHtml(p.price)} บาท</div>
+          <div class="meta">${escapeHtml(p.desc || 'ไม่มีรายละเอียด')}</div><div class="meta">รอผู้คุมตรวจสอบด้วยตนเอง</div>
+          <button class="submit-btn approve-product" data-id="${escapeHtml(p.id)}" style="margin-top:8px;padding:8px;">อนุมัติ</button>
+          <button class="submit-btn reject-product" data-id="${escapeHtml(p.id)}" style="margin-top:8px;padding:8px;background:var(--peach-deep);">ปฏิเสธ</button></div>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('.approve-product').forEach(button => {
+        button.onclick = async () => {
+          try {
+            await updateDoc(doc(db, 'products', button.dataset.id), { approved: true, moderationStatus: 'approved', moderationReason: '', reviewedAt: serverTimestamp(), reviewedBy: currentUser.uid });
+            showToast('อนุมัติสินค้าแล้ว');
+          } catch(error) {
+            showToast('อนุมัติไม่สำเร็จ: ' + error.message);
+          }
+        };
+      });
+      list.querySelectorAll('.reject-product').forEach(button => {
+        button.onclick = async () => {
+          const reason = window.prompt('เหตุผลที่ปฏิเสธสินค้า (จำเป็น)');
+          if (!reason || !reason.trim()) return;
+          try {
+            await updateDoc(doc(db, 'products', button.dataset.id), { approved: false, moderationStatus: 'rejected', moderationReason: reason.trim(), reviewedAt: serverTimestamp(), reviewedBy: currentUser.uid });
+            showToast('บันทึกการปฏิเสธแล้ว');
+          } catch(error) {
+            showToast('ปฏิเสธไม่สำเร็จ: ' + error.message);
+          }
+        };
+      });
+    }, error => { list.textContent = 'ไม่สามารถโหลดรายการรออนุมัติได้: ' + error.message; });
+  }
+
+  document.getElementById('approveAllBtn').onclick = async () => {
+    const buttons = [...document.querySelectorAll('.approve-product')];
+    if (!buttons.length) {
+      showToast('ไม่มีสินค้ารออนุมัติ');
+      return;
+    }
+    if (!window.confirm(`ยืนยันอนุมัติสินค้าทั้งหมด ${buttons.length} รายการหรือไม่?`)) return;
+    try {
+      await Promise.all(buttons.map(button => updateDoc(doc(db, 'products', button.dataset.id), {
+        approved: true,
+        moderationStatus: 'approved',
+        moderationReason: '',
+        reviewedAt: serverTimestamp(),
+        reviewedBy: currentUser.uid
+      })));
+      showToast('อนุมัติสินค้าทั้งหมดแล้ว');
+    } catch(error) {
+      showToast('อนุมัติทั้งหมดไม่สำเร็จ: ' + error.message);
+    }
+  };
+
+  document.getElementById('adminLoginForm').onsubmit = async event => {
+    event.preventDefault();
+    const username = document.getElementById('adminUsername').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    if(username.toLowerCase() !== adminEmail){
+      showToast('อีเมลแอดมินไม่ถูกต้อง');
+      return;
+    }
+    try {
+      await signInWithEmailAndPassword(auth, adminEmail, password);
+      document.getElementById('adminLoginPanel').style.display = 'none';
+      document.getElementById('adminPanel').style.display = 'block';
+      loadPendingProducts();
+    } catch(error) {
+      showToast('เข้าสู่ระบบแอดมินไม่สำเร็จ กรุณาตั้งบัญชีใน Firebase Authentication ก่อน');
+    }
+  };
+
+  adminBtn.onclick = () => {
+    document.getElementById('adminModalBackdrop').classList.add('open');
+    document.getElementById('adminLoginPanel').style.display = currentUser?.email === adminEmail.toLowerCase() ? 'none' : 'block';
+    document.getElementById('adminPanel').style.display = currentUser?.email === adminEmail.toLowerCase() ? 'block' : 'none';
+    if(currentUser?.email === adminEmail.toLowerCase()) loadPendingProducts();
+  };
+  document.getElementById('adminModalClose').onclick = closeAllModals;
+
+  subscribeProducts();
+
+  
+
+</script>
+</body>
+</html>
