@@ -968,10 +968,21 @@
       messages.textContent = 'ไม่สามารถเปิดแชทนี้ได้';
       return;
     }
-    const chatQuery = query(messagesRef, where('participantUids', 'array-contains', currentUser.uid));
+    messages.innerHTML = '<div class="meta" style="text-align:center;padding:30px 0;">กำลังโหลดแชท...</div>';
+    let settled = false;
+    const loadingTimeout = setTimeout(() => {
+      if(settled) return;
+      messages.innerHTML = '<div class="meta" style="text-align:center;padding:30px 0;">โหลดแชทนานเกินไป กรุณารีเฟรชหน้าเว็บ</div>';
+    }, 10000);
+    const chatQuery = query(
+      messagesRef,
+      where('participantUids', 'array-contains', currentUser.uid),
+      where('conversationId', '==', chatConversationId)
+    );
     chatUnsubscribe = onSnapshot(chatQuery, snapshot => {
+      settled = true;
+      clearTimeout(loadingTimeout);
       const items = snapshot.docs.map(item => ({ id:item.id, ...item.data() }))
-        .filter(item => item.conversationId === chatConversationId)
         .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
       items.forEach(item => {
         if(!item.senderName && item.senderEmail) item.senderName = item.senderEmail.split('@')[0];
@@ -979,8 +990,10 @@
       messages.innerHTML = items.length ? items.map(item => { const mine = item.senderUid === currentUser.uid; const name = item.senderName || 'ผู้ใช้โรงเรียน'; const email = item.senderEmail || (mine ? currentUser.email : 'อีเมลไม่พร้อมใช้งาน (ข้อความเก่า)'); const avatar = item.senderPhotoUrl ? `<img src="${escapeHtml(item.senderPhotoUrl)}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;">` : '<span style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--lavender);">👤</span>'; return `<div style="display:flex;align-items:flex-end;gap:6px;justify-content:${mine ? 'flex-end' : 'flex-start'};margin:8px 0;">${mine ? '' : avatar}<div style="max-width:75%;text-align:${mine ? 'right' : 'left'};"><small class="meta">${escapeHtml(name)}<br>${escapeHtml(email)}</small><div style="padding:8px 10px;border-radius:10px;background:${mine ? 'var(--lavender)' : 'var(--bg-card)'};border:1px solid var(--line);">${escapeHtml(item.text)}</div></div>${mine ? avatar : ''}</div>`; }).join('') : '<div class="meta" style="text-align:center;padding:30px 0;">เริ่มการสนทนาได้เลย</div>';
       messages.scrollTop = messages.scrollHeight;
     }, error => {
+      settled = true;
+      clearTimeout(loadingTimeout);
       console.error('Chat messages error:', error);
-      messages.innerHTML = `<div class="meta" style="text-align:center;padding:30px 0;">โหลดแชทไม่ได้ กรุณาปิดแล้วเปิดแชทใหม่</div>`;
+      messages.innerHTML = `<div class="meta" style="text-align:center;padding:30px 0;">โหลดแชทไม่ได้: ${escapeHtml(error.code || error.message || 'ไม่ทราบสาเหตุ')}</div>`;
     });
   }
 
