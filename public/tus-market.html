@@ -557,6 +557,7 @@
   let chatParticipantUids = [];
   let chatParticipantUids = [];
   let chatParticipantUids = [];
+  let chatParticipantUids = [];
 
   // หมวดหมู่สินค้าสำหรับตลาดนักเรียน
   const CATEGORIES = [
@@ -957,6 +958,7 @@
       return;
     }
     chatConversationId = `${chatProduct.id}_${[chatProduct.uid, currentUser.uid].sort().join('_')}`;
+    chatParticipantUids = [chatProduct.uid, currentUser.uid];
     chatParticipantUids = [chatProduct.uid, currentUser.uid];
     chatParticipantUids = [chatProduct.uid, currentUser.uid];
     chatParticipantUids = [chatProduct.uid, currentUser.uid];
