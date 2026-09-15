@@ -4,25 +4,19 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build_and_deploy:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Deploy Firestore rules
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TUS_MARKET }}
-
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
-
-      - name: Publish Firestore rules
-        run: firebase deploy --only firestore:rules --project tus-market --non-interactive
-
-      - name: Deploy Hosting
+      - name: Deploy Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
