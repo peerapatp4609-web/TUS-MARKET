@@ -7,14 +7,37 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  deploy:
+  cleanup-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Remove obsolete files and workflows
+        shell: bash
+        run: |
+          set -e
+          rm -f \
+            firestore-chat-v2.rules \
+            tus-market-CHAT-V2.html \
+            index.html \
+            main \
+            netlify.toml \
+            .github/workflows/fix-chat.yml \
+            .github/workflows/firebase-hosting-pull-request.yml
+
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Clean up obsolete TUS-MARKET files"
+            git push
+          fi
 
       - name: Deploy Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
