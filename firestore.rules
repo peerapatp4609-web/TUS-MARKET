@@ -8,18 +8,19 @@ service cloud.firestore {
     // =========================
     match /products/{productId} {
 
-      // อ่านสินค้า
-      allow read: if resource.data.approved == true
-        || (request.auth != null
-            && resource.data.uid == request.auth.uid)
+      allow read: if
+        resource.data.approved == true
+        || (
+          request.auth != null
+          && resource.data.uid == request.auth.uid
+        )
         || isAdmin();
 
-      // เพิ่มสินค้า
-      allow create: if isSchoolUser()
+      allow create: if
+        isSchoolUser()
         && request.resource.data.uid == request.auth.uid
         && validProduct(request.resource.data);
 
-      // แก้ไขสินค้า
       allow update: if
         (
           isSchoolUser()
@@ -46,7 +47,6 @@ service cloud.firestore {
           && validProduct(request.resource.data)
         );
 
-      // ลบสินค้า
       allow delete: if
         (
           isSchoolUser()
@@ -61,74 +61,55 @@ service cloud.firestore {
     // =========================
     match /messages/{messageId} {
 
-      /*
-       * ส่งข้อความได้ 2 กรณี
-       *
-       * 1. คนซื้อส่งหาคนขาย
-       * 2. คนขายตอบกลับคนซื้อ
-       *
-       * ต้องเป็นสมาชิกใน participantUids
-       * และ sellerUid ต้องตรงกับเจ้าของสินค้าจริง
-       */
+      // ผู้ซื้อและผู้ขายสามารถส่งข้อความได้
       allow create: if
         isSchoolUser()
 
-        // ผู้ส่งต้องเป็นตัวเอง
+        // sender ต้องเป็นบัญชีที่กำลังล็อกอิน
         && request.resource.data.senderUid == request.auth.uid
 
-        // email ต้องตรงกับบัญชีที่ล็อกอิน
-        && request.resource.data.senderEmail
-            == request.auth.token.email
-
+        // email ต้องตรงกับ Firebase Auth
+        && request.resource.data.senderEmail == request.auth.token.email
         && request.resource.data.senderEmail is string
 
-        // ข้อมูลพื้นฐาน
+        // ข้อมูลหลัก
         && request.resource.data.productId is string
         && request.resource.data.conversationId is string
         && request.resource.data.text is string
 
-        // ความยาวข้อความ
+        // ข้อความต้องไม่ว่าง และไม่เกิน 500 ตัว
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 500
+
+        // participantUids ต้องเป็น list
+        && request.resource.data.participantUids is list
+
+        // ต้องมีผู้สนทนา 2 คน
+        && request.resource.data.participantUids.size() == 2
+
+        // UID ทั้งสองต้องไม่ซ้ำกัน
+        && request.resource.data.participantUids[0]
+           != request.resource.data.participantUids[1]
+
+        // sender ต้องอยู่ใน participantUids
+        && request.auth.uid in request.resource.data.participantUids
+
+        // seller ต้องอยู่ใน participantUids
+        && request.resource.data.sellerUid
+           in request.resource.data.participantUids
 
         // sellerUid ต้องเป็นเจ้าของสินค้าจริง
         && get(
           /databases/$(database)/documents/products/$(request.resource.data.productId)
         ).data.uid == request.resource.data.sellerUid
 
-        // สินค้าต้องได้รับอนุมัติแล้ว
+        // สินค้าต้องผ่านการอนุมัติ
         && get(
           /databases/$(database)/documents/products/$(request.resource.data.productId)
-        ).data.approved == true
-
-        // ผู้ส่งต้องอยู่ในคู่สนทนา
-        && request.auth.uid in request.resource.data.participantUids
-
-        // seller ต้องอยู่ในคู่สนทนา
-        && request.resource.data.sellerUid
-            in request.resource.data.participantUids
-
-        // ต้องมีผู้สนทนา 2 คน
-        && request.resource.data.participantUids.size() == 2
-
-        /*
-         * กรณีคนขายตอบ:
-         * ผู้ส่งต้องเป็นเจ้าของสินค้า
-         */
-        && (
-          request.auth.uid == request.resource.data.sellerUid
-
-          ||
-
-          /*
-           * กรณีคนซื้อส่ง:
-           * ผู้ส่งต้องไม่ใช่ seller
-           */
-          request.auth.uid != request.resource.data.sellerUid
-        );
+        ).data.approved == true;
 
 
-      // อ่านแชท
+      // อ่านข้อความได้เฉพาะคู่สนทนา
       allow read: if
         isAdmin()
         ||
@@ -138,7 +119,7 @@ service cloud.firestore {
         );
 
 
-      // ลบข้อความ
+      // ลบข้อความได้เฉพาะคู่สนทนาหรือ Admin
       allow delete: if
         isAdmin()
         ||
@@ -154,10 +135,8 @@ service cloud.firestore {
     // =========================
     match /users/{userId} {
 
-      // ผู้ใช้ที่ล็อกอินสามารถอ่านข้อมูล user ได้
       allow read: if request.auth != null;
 
-      // สร้าง / แก้ไขเฉพาะข้อมูลของตัวเอง
       allow create, update: if
         request.auth != null
         && request.auth.uid == userId
@@ -189,44 +168,44 @@ service cloud.firestore {
 
     function validProduct(data) {
       return data.keys().hasAll([
-          'name',
-          'price',
-          'cat',
-          'desc',
-          'seller',
-          'room',
-          'line',
-          'image',
-          'uid',
-          'createdAt'
-        ])
+        'name',
+        'price',
+        'cat',
+        'desc',
+        'seller',
+        'room',
+        'line',
+        'image',
+        'uid',
+        'createdAt'
+      ])
 
-        && data.name is string
-        && data.name.size() > 0
-        && data.name.size() <= 120
+      && data.name is string
+      && data.name.size() > 0
+      && data.name.size() <= 120
 
-        && data.price is number
-        && data.price >= 0
-        && data.price <= 1000000
+      && data.price is number
+      && data.price >= 0
+      && data.price <= 1000000
 
-        && data.cat is string
+      && data.cat is string
 
-        && data.desc is string
-        && data.desc.size() <= 1000
+      && data.desc is string
+      && data.desc.size() <= 1000
 
-        && data.seller is string
-        && data.seller.size() > 0
-        && data.seller.size() <= 80
+      && data.seller is string
+      && data.seller.size() > 0
+      && data.seller.size() <= 80
 
-        && data.room is string
-        && data.room.size() <= 40
+      && data.room is string
+      && data.room.size() <= 40
 
-        && data.line is string
-        && data.line.size() <= 80
+      && data.line is string
+      && data.line.size() <= 80
 
-        && data.uid is string
+      && data.uid is string
 
-        && (data.image == null || data.image is string);
+      && (data.image == null || data.image is string);
     }
   }
 }
