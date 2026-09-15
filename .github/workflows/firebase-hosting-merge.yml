@@ -9,8 +9,12 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: tus-market-main
+  cancel-in-progress: true
+
 jobs:
-  cleanup-and-deploy:
+  build_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,26 +22,310 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Remove obsolete files and workflows
+      - name: Authenticate for Firebase CLI
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TUS_MARKET }}
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Repair and harden the web app
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('public/tus-market.html')
+          text = path.read_text(encoding='utf-8')
+          original = text
+
+          # 1) Remove accidental duplicate declarations/assignments from old patch runs.
+          text = re.sub(
+              r'  let chatParticipantUids = \[\];\n(?:  let chatParticipantUids = \[\];\n)+',
+              '  let chatParticipantUids = [];\n',
+              text,
+          )
+          text = re.sub(
+              r'(    chatParticipantUids = \[chatProduct\.uid, currentUser\.uid\];\n)(?:    chatParticipantUids = \[chatProduct\.uid, currentUser\.uid\];\n)+',
+              r'\1',
+              text,
+          )
+
+          # 2) Normalize school-email checks and never let optional profile sync break login.
+          text = text.replace(
+              '      const email = user.email || "";\n      if (!email.endsWith("@triamudomsouth.ac.th"))',
+              '      const email = (user.email || "").trim().toLowerCase();\n      if (!email.endsWith("@triamudomsouth.ac.th"))'
+          )
+
+          old_profile = '''      await setDoc(doc(db, 'users', user.uid), {
+        displayName: user.displayName || user.email || 'ผู้ใช้โรงเรียน',
+        email: user.email || '',
+        photoURL: user.photoURL || ''
+      }, { merge: true });'''
+          new_profile = '''      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          displayName: user.displayName || user.email || 'ผู้ใช้โรงเรียน',
+          email: user.email || '',
+          photoURL: user.photoURL || ''
+        }, { merge: true });
+      } catch (profileError) {
+        console.warn('User profile sync skipped:', profileError);
+      }'''
+          text = text.replace(old_profile, new_profile)
+
+          # 3) Add client-side image validation and protect Firestore document size.
+          marker = '''  function resizeImage(file, maxDim=450, quality=0.68){'''
+          helper = '''  const MAX_IMAGE_FILE_BYTES = 8 * 1024 * 1024;
+  const MAX_IMAGE_DATA_LENGTH = 900000;
+
+  function validateImageFile(file){
+    if(!file) return true;
+    if(!file.type || !file.type.startsWith('image/')){
+      showToast('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      return false;
+    }
+    if(file.size > MAX_IMAGE_FILE_BYTES){
+      showToast('รูปภาพใหญ่เกินไป กรุณาใช้ไฟล์ไม่เกิน 8 MB');
+      return false;
+    }
+    return true;
+  }
+
+  function validateProductData(data){
+    if(!data.name || data.name.length > 120) return 'ชื่อสินค้าต้องมี 1-120 ตัวอักษร';
+    if(!Number.isFinite(data.price) || data.price < 0 || data.price > 1000000) return 'ราคาต้องอยู่ระหว่าง 0-1,000,000 บาท';
+    if(!data.cat) return 'กรุณาเลือกหมวดหมู่สินค้า';
+    if(data.desc.length > 1000) return 'รายละเอียดต้องไม่เกิน 1,000 ตัวอักษร';
+    if(!data.seller || data.seller.length > 80) return 'ชื่อผู้ขายต้องมี 1-80 ตัวอักษร';
+    if(!data.room || data.room.length > 40) return 'ห้อง/ชั้นต้องไม่เกิน 40 ตัวอักษร';
+    if(data.image && data.image.length > MAX_IMAGE_DATA_LENGTH) return 'รูปภาพหลังบีบอัดยังใหญ่เกินไป กรุณาใช้รูปอื่น';
+    return '';
+  }
+
+''' + marker
+          text = text.replace(marker, helper)
+
+          text = text.replace(
+              '    if(file){\n      try{\n        pendingImageData = await resizeImage(file);',
+              '    if(file){\n      if(!validateImageFile(file)){ e.target.value = \"\"; return; }\n      try{\n        pendingImageData = await resizeImage(file);'
+          )
+          text = text.replace(
+              '    if(file){\n      try{\n        editImageData = await resizeImage(file);',
+              '    if(file){\n      if(!validateImageFile(file)){ e.target.value = \"\"; return; }\n      try{\n        editImageData = await resizeImage(file);'
+          )
+          text = text.replace(
+              "        img.src = reader.result;\n      };",
+              "        img.src = reader.result;\n      };")
+
+          # 4) Improve the add-product UX after form reset.
+          text = text.replace(
+              "    document.getElementById('addProductForm').reset();\n    document.getElementById('previewImgWrap').style.display = 'none';",
+              "    document.getElementById('addProductForm').reset();\n    document.getElementById('sellerInput').value = currentUser.displayName ? currentUser.displayName.split(' ')[0] : '';\n    document.getElementById('previewImgWrap').style.display = 'none';"
+          )
+
+          # 5) Add validation before creating a product.
+          old_add = '''    const fd = new FormData(e.target);
+    try {
+      showToast("กำลังลงขายสินค้า...");
+      await addDoc(productsRef, {
+        name: fd.get('name').trim(),
+        price: Number(fd.get('price')),
+        cat: fd.get('cat'),
+        desc: fd.get('desc') ? fd.get('desc').trim() : '',
+        seller: fd.get('seller').trim(),
+        room: fd.get('room').trim(),
+        line: '',
+        image: pendingImageData || null,
+        uid: currentUser.uid,
+        approved: false,
+        moderationStatus: 'pending_manual',
+        createdAt: serverTimestamp()
+      });'''
+          new_add = '''    if(!currentUser){
+      showToast('กรุณาเข้าสู่ระบบก่อนลงขายสินค้า');
+      return;
+    }
+    const fd = new FormData(e.target);
+    const productData = {
+      name: String(fd.get('name') || '').trim(),
+      price: Number(fd.get('price')),
+      cat: String(fd.get('cat') || ''),
+      desc: String(fd.get('desc') || '').trim(),
+      seller: String(fd.get('seller') || '').trim(),
+      room: String(fd.get('room') || '').trim(),
+      image: pendingImageData || null,
+    };
+    const validationError = validateProductData(productData);
+    if(validationError){
+      showToast(validationError);
+      return;
+    }
+    try {
+      showToast("กำลังลงขายสินค้า...");
+      await addDoc(productsRef, {
+        ...productData,
+        line: '',
+        uid: currentUser.uid,
+        approved: false,
+        moderationStatus: 'pending_manual',
+        createdAt: serverTimestamp()
+      });'''
+          text = text.replace(old_add, new_add)
+
+          # 6) Validate edited product data too.
+          old_edit = '''      const updatedData = {
+        name: fd.get('name').trim(),
+        price: Number(fd.get('price')),
+        cat: fd.get('cat'),
+        desc: fd.get('desc') ? fd.get('desc').trim() : '',
+        seller: fd.get('seller').trim(),
+        room: fd.get('room').trim(),
+        line: p.line || '',
+      };
+
+      if (editImageData) {
+        updatedData.image = editImageData;
+      }
+
+      await updateDoc(doc(db, 'products', p.id), updatedData);'''
+          new_edit = '''      const updatedData = {
+        name: String(fd.get('name') || '').trim(),
+        price: Number(fd.get('price')),
+        cat: String(fd.get('cat') || ''),
+        desc: String(fd.get('desc') || '').trim(),
+        seller: String(fd.get('seller') || '').trim(),
+        room: String(fd.get('room') || '').trim(),
+        line: p.line || '',
+        image: editImageData || p.image || null,
+      };
+      const validationError = validateProductData(updatedData);
+      if(validationError){
+        showToast(validationError);
+        return;
+      }
+
+      await updateDoc(doc(db, 'products', p.id), updatedData);'''
+          text = text.replace(old_edit, new_edit)
+
+          # 7) Keep participant IDs on the actual inbox button, not only its wrapper.
+          text = text.replace(
+              'data-conversation-id="${escapeHtml(latest.conversationId)}" style="flex:1;min-width:0;text-align:left;',
+              'data-conversation-id="${escapeHtml(latest.conversationId)}" data-participants="${escapeHtml(JSON.stringify(latest.participantUids || []))}" style="flex:1;min-width:0;text-align:left;'
+          )
+
+          # 8) Do not fetch other students\' user documents from the inbox; message records already carry display data.
+          old_profile_block = '''          let senderProfile = null;
+          if(latest.senderUid){
+            const profileSnapshot = await getDoc(doc(db, 'users', latest.senderUid));
+            senderProfile = profileSnapshot.exists() ? profileSnapshot.data() : null;
+          }
+          const senderEmail = latest.senderEmail || senderProfile?.email || '';
+          return product ? { latest: { ...latest, senderName: latest.senderName || senderProfile?.displayName || senderEmail.split('@')[0], senderEmail, senderPhotoUrl: latest.senderPhotoUrl || senderProfile?.photoURL }, product } : null;'''
+          new_profile_block = '''          const senderEmail = latest.senderEmail || '';
+          return product ? { latest: { ...latest, senderName: latest.senderName || senderEmail.split('@')[0] || 'ผู้ใช้โรงเรียน', senderEmail, senderPhotoUrl: latest.senderPhotoUrl || '' }, product } : null;'''
+          text = text.replace(old_profile_block, new_profile_block)
+
+          # 9) Reuse the exact participant list when a seller replies from the inbox and block unsafe fallback sends.
+          old_open = '''          try { chatParticipantUids = JSON.parse(button.dataset.participants || '[]'); } catch { chatParticipantUids = []; }
+          if (!Array.isArray(chatParticipantUids) || chatParticipantUids.length !== 2) { chatParticipantUids = [chatProduct.uid, currentUser.uid]; }
+          markChatRead(chatConversationId);'''
+          new_open = '''          try { chatParticipantUids = JSON.parse(button.dataset.participants || '[]'); } catch { chatParticipantUids = []; }
+          if (!Array.isArray(chatParticipantUids) || chatParticipantUids.length !== 2 || chatParticipantUids[0] === chatParticipantUids[1] || !chatParticipantUids.includes(currentUser.uid)) {
+            chatParticipantUids = [];
+          }
+          if(!chatParticipantUids.length){
+            showToast('บทสนทนาเก่านี้ไม่มีข้อมูลผู้ร่วมแชตที่ปลอดภัย จึงยังตอบกลับไม่ได้');
+            return;
+          }
+          markChatRead(chatConversationId);'''
+          text = text.replace(old_open, new_open)
+
+          old_submit_guard = "    if(!text || !chatProduct || !chatConversationId || !currentUser || submitButton?.disabled) return;"
+          new_submit_guard = "    if(!text || !chatProduct || !chatConversationId || !currentUser || chatParticipantUids.length !== 2 || chatParticipantUids[0] === chatParticipantUids[1] || !chatParticipantUids.includes(currentUser.uid) || submitButton?.disabled) return;"
+          text = text.replace(old_submit_guard, new_submit_guard)
+
+          # 10) Make login/admin email comparisons consistent after normalization.
+          text = text.replace(
+              "    if(username.toLowerCase() !== adminEmail){",
+              "    if(username.trim().toLowerCase() !== adminEmail.toLowerCase()){"
+          )
+          text = text.replace(
+              "    document.getElementById('adminLoginPanel').style.display = currentUser?.email === adminEmail.toLowerCase() ? 'none' : 'block';",
+              "    document.getElementById('adminLoginPanel').style.display = currentUser?.email?.toLowerCase() === adminEmail.toLowerCase() ? 'none' : 'block';"
+          )
+          text = text.replace(
+              "    document.getElementById('adminPanel').style.display = currentUser?.email === adminEmail.toLowerCase() ? 'block' : 'none';",
+              "    document.getElementById('adminPanel').style.display = currentUser?.email?.toLowerCase() === adminEmail.toLowerCase() ? 'block' : 'none';"
+          )
+          text = text.replace(
+              "    if(currentUser?.email === adminEmail.toLowerCase()) loadPendingProducts();",
+              "    if(currentUser?.email?.toLowerCase() === adminEmail.toLowerCase()) loadPendingProducts();"
+          )
+
+          # 11) Cleanly stop listeners on sign-out.
+          text = text.replace(
+              "      if(notificationUnsubscribe) notificationUnsubscribe();\n      updateChatNotification(0, 0);",
+              "      if(notificationUnsubscribe) { notificationUnsubscribe(); notificationUnsubscribe = null; }\n      if(chatUnsubscribe) { chatUnsubscribe(); chatUnsubscribe = null; }\n      if(inboxUnsubscribe) { inboxUnsubscribe(); inboxUnsubscribe = null; }\n      if(adminUnsubscribe) { adminUnsubscribe(); adminUnsubscribe = null; }\n      updateChatNotification(0, 0);"
+          )
+
+          # 12) Better HTML constraints for common product fields.
+          text = text.replace(
+              '<input type="number" name="price" required placeholder="0">',
+              '<input type="number" name="price" required min="0" max="1000000" step="0.01" placeholder="0">'
+          )
+          text = text.replace(
+              '<input type="text" name="name" required placeholder="เช่น ชานมไข่มุก, ชีทชีวะ">',
+              '<input type="text" name="name" required maxlength="120" placeholder="เช่น ชานมไข่มุก, ชีทชีวะ">'
+          )
+          text = text.replace(
+              '<input type="text" name="seller" id="sellerInput" required>',
+              '<input type="text" name="seller" id="sellerInput" required maxlength="80">'
+          )
+          text = text.replace(
+              '<input type="text" name="room" required placeholder="ม.6/3">',
+              '<input type="text" name="room" required maxlength="40" placeholder="ม.6/3">'
+          )
+          text = text.replace(
+              '<textarea name="desc" placeholder="เช่น สภาพ 95%, นัดรับได้ที่ตึก 3 ช่วงพักเที่ยง"></textarea>',
+              '<textarea name="desc" maxlength="1000" placeholder="เช่น สภาพ 95%, นัดรับได้ที่ตึก 3 ช่วงพักเที่ยง"></textarea>'
+          )
+
+          if text != original:
+              path.write_text(text, encoding='utf-8')
+          else:
+              print('No source changes needed; app is already hardened.')
+
+      - name: Validate web app JavaScript
         shell: bash
         run: |
-          set -e
-          rm -f \
-            firestore-chat-v2.rules \
-            tus-market-CHAT-V2.html \
-            index.html \
-            main \
-            netlify.toml \
-            .github/workflows/fix-chat.yml \
-            .github/workflows/firebase-hosting-pull-request.yml
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          source = Path('public/tus-market.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script\s+type=["\']module["\']>(.*?)</script>', source, flags=re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f'Expected exactly one module script, found {len(scripts)}')
+          Path('/tmp/tus-market.mjs').write_text(scripts[0], encoding='utf-8')
+          PY
+          node --check /tmp/tus-market.mjs
+          git diff --check
 
-          if ! git diff --quiet; then
+      - name: Commit automatic source hardening
+        run: |
+          if git diff --quiet; then
+            echo "No source changes to commit."
+          else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add -A
-            git commit -m "Clean up obsolete TUS-MARKET files"
-            git push
+            git add public/tus-market.html
+            git commit -m "Harden marketplace app"
+            git push origin HEAD:main
           fi
+
+      - name: Publish Firestore rules
+        continue-on-error: true
+        run: firebase deploy --only firestore:rules --project tus-market --non-interactive
 
       - name: Deploy Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
