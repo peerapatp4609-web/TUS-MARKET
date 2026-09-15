@@ -2,17 +2,15 @@
 
 ตลาดนัดออนไลน์สำหรับนักเรียน TUS
 
-## โครงสร้างหลัก
+## โครงสร้าง production
 
-- `public/tus-market.html` — เว็บแอปตัวหลัก
-- `public/index.html` — หน้าเริ่มต้นของเว็บ
-- `public/assets/` — รูปและไฟล์ประกอบเว็บ
+- `public/app.html` — เว็บแอป production ตัวเดียว
+- `public/index.html` — หน้าเข้าเว็บ
+- `public/assets/` — ไฟล์ประกอบเว็บ
+- `firebase.json` — Firebase Hosting + Firestore
 - `firestore.rules` — กฎความปลอดภัย Firestore
-- `firestore.indexes.json` — ดัชนีสำหรับระบบแชต
-- `firebase.json` — การตั้งค่า Firebase Hosting และ Firestore
-- `.firebaserc` — ระบุ Firebase project `tus-market`
-- `.github/workflows/firebase-hosting-merge.yml` — workflow เดียวสำหรับตรวจสอบและ deploy Firebase
+- `firestore.indexes.json` — ดัชนีระบบแชต
+- `.firebaserc` — Firebase project `tus-market`
+- `.github/workflows/firebase-hosting-merge.yml` — workflow deploy ตัวเดียว
 
-ระบบ production ใช้ Firebase เป็นหลัก
-
-Deployment verification trigger.
+ระบบ production ใช้ Firebase เป็นระบบหลัก ทั้ง Hosting, Firestore และ Authentication
