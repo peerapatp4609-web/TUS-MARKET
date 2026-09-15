@@ -553,6 +553,8 @@
   let notificationUnsubscribe = null;
   let chatProduct = null;
   let chatConversationId = null;
+  let chatParticipantUids = [];
+  const chatConversationParticipants = new Map();
 
   // หมวดหมู่สินค้าสำหรับตลาดนักเรียน
   const CATEGORIES = [
@@ -953,6 +955,7 @@
       return;
     }
     chatConversationId = `${chatProduct.id}_${[chatProduct.uid, currentUser.uid].sort().join('_')}`;
+    chatParticipantUids = [chatProduct.uid, currentUser.uid];
     markChatRead(chatConversationId);
     document.getElementById('modalBackdrop').classList.remove('open');
     document.getElementById('chatModalTitle').textContent = `แชท: ${chatProduct.name}`;
@@ -1005,7 +1008,30 @@
     if(!text || !chatProduct || !chatConversationId || !currentUser || submitButton?.disabled) return;
     if(submitButton) submitButton.disabled = true;
     try {
-      await addDoc(messagesRef, { conversationId: chatConversationId, productId: chatProduct.id, sellerUid: chatProduct.uid, senderUid: currentUser.uid, senderName: currentUser.displayName || currentUser.email || 'ผู้ใช้โรงเรียน', senderEmail: currentUser.email || '', senderPhotoUrl: currentUser.photoURL || '', participantUids: [chatProduct.uid, currentUser.uid], text, createdAt: serverTimestamp() });
+      const participants = Array.from(new Set([
+        ...(Array.isArray(chatParticipantUids) ? chatParticipantUids : []),
+        chatProduct.uid,
+        currentUser.uid
+      ]));
+
+      if(participants.length !== 2){
+        throw new Error('รายชื่อผู้สนทนาไม่ถูกต้อง กรุณาปิดแล้วเปิดแชทใหม่');
+      }
+
+      await addDoc(messagesRef, {
+        conversationId: chatConversationId,
+        productId: chatProduct.id,
+        sellerUid: chatProduct.uid,
+        senderUid: currentUser.uid,
+        senderName: currentUser.displayName || currentUser.email || 'ผู้ใช้โรงเรียน',
+        senderEmail: currentUser.email || '',
+        senderPhotoUrl: currentUser.photoURL || '',
+        participantUids: participants,
+        text,
+        createdAt: serverTimestamp()
+      });
+      chatParticipantUids = participants;
+      chatConversationParticipants.set(chatConversationId, participants);
       input.value = '';
     } catch(error) {
       console.error('Send chat message error:', error);
@@ -1041,6 +1067,13 @@
         const previous = grouped.get(message.conversationId);
         if(!previous || (message.createdAt?.seconds || 0) > (previous.createdAt?.seconds || 0)) grouped.set(message.conversationId, message);
       });
+      chatConversationParticipants.clear();
+      [...grouped.values()].forEach(latest => {
+        const participants = Array.isArray(latest.participantUids)
+          ? [...new Set(latest.participantUids)]
+          : [];
+        chatConversationParticipants.set(latest.conversationId, participants);
+      });
       const conversations = await Promise.all([...grouped.values()].map(async latest => {
         try {
           let product = PRODUCTS.find(item => item.id === latest.productId);
@@ -1071,6 +1104,10 @@
         button.onclick = () => {
           chatProduct = PRODUCTS.find(item => item.id === button.dataset.productId) || visible.find(item => item.product.id === button.dataset.productId)?.product;
           chatConversationId = button.dataset.conversationId;
+          chatParticipantUids = chatConversationParticipants.get(chatConversationId) || [];
+          if(!chatParticipantUids.length && chatProduct && currentUser){
+            chatParticipantUids = [chatProduct.uid, currentUser.uid];
+          }
           markChatRead(chatConversationId);
           if(!chatProduct) return;
           document.getElementById('inboxModalBackdrop').classList.remove('open');
