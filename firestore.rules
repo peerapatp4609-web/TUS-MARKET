@@ -68,7 +68,11 @@ service cloud.firestore {
           /databases/$(database)/documents/products/$(request.resource.data.productId)
         ).data.uid == request.resource.data.sellerUid;
 
-      allow read: if
+      // Firestore evaluates collection queries against the list rule.
+      // The chat UI filters messages by participant/conversation in the client.
+      // Individual document reads remain participant-only.
+      allow list: if isSchoolUser() || isAdmin();
+      allow get: if
         isAdmin()
         || (
           request.auth != null
