@@ -28,8 +28,21 @@ jobs:
           test -f firestore.indexes.json
           test -f public/index.html
           test -f public/app.html
-          python3 -c 'from pathlib import Path; import json, re; s=Path("public/app.html").read_text(encoding="utf-8"); m=re.findall(r"<script\\s+type=[\"\\x27]module[\"\\x27]>(.*?)</script>",s,re.S); assert len(m)==1, f"Expected exactly one module script, found {len(m)}"; Path("/tmp/tus-market-app.mjs").write_text(m[0],encoding="utf-8"); json.loads(Path("firebase.json").read_text(encoding="utf-8")); json.loads(Path("firestore.indexes.json").read_text(encoding="utf-8"))'
-          node --check /tmp/tus-market-app.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+          import subprocess
+
+          source = Path('public/app.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script\s+type=["\x27]module["\x27]>(.*?)</script>', source, flags=re.S)
+          if len(scripts) != 1:
+              raise SystemExit(f'Expected exactly one module script, found {len(scripts)}')
+          Path('/tmp/tus-market-app.mjs').write_text(scripts[0], encoding='utf-8')
+          subprocess.run(['node', '--check', '/tmp/tus-market-app.mjs'], check=True)
+          json.loads(Path('firebase.json').read_text(encoding='utf-8'))
+          json.loads(Path('firestore.indexes.json').read_text(encoding='utf-8'))
+          PY
           git diff --check
 
       - name: Deploy Firebase Hosting
