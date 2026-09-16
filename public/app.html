@@ -112,8 +112,8 @@
   async function deleteProduct(p){if(!confirm('ลบสินค้านี้ใช่ไหม?'))return;try{await deleteDoc(doc(db,'products',p.id));close('detailModal');showToast('ลบสินค้าแล้ว')}catch(x){showToast(`ลบไม่สำเร็จ: ${x.code||x.message}`)}}
 
   function getReads(){try{return JSON.parse(localStorage.getItem(`tusReads:${user?.uid}`)||'{}')}catch{return{}}}function markRead(cid){if(!user)return;const r=getReads();r[cid]=Math.floor(Date.now()/1000);localStorage.setItem(`tusReads:${user.uid}`,JSON.stringify(r));updateUnread()}
-  function updateUnread(){if(!user){$('chatBadge').hidden=true;return}if(notifyUnsub)notifyUnsub();notifyUnsub=onSnapshot(query(MESSAGES,where('participantUids','array-contains',user.uid)),snap=>{const r=getReads();let n=0;const people=new Set();for(const d of snap.docs){const m=d.data();if(m.senderUid!==user.uid&&(m.createdAt?.seconds||0)>(r[m.conversationId]||0)){n++;people.add(m.senderUid)}}$('chatBadge').textContent=n>99?'99+':n;$('chatBadge').hidden=n===0})}
-  function startChat(p,existingParticipants=null,existingId=null){if(!user){showToast('กรุณาเข้าสู่ระบบก่อน');return}if(p.uid===user.uid){showToast('เปิดกล่องแชทเพื่อดูคนที่ติดต่อคุณ');return}chatProduct=p;requested=Array.isArray(existingParticipants)?existingParticipants:[];participants=(requested.length===2&&requested[0]!==requested[1]&&requested.includes(user.uid))?requested:[p.uid,user.uid];chatConversation=existingId||`${p.id}_${[p.uid,user.uid].sort().join('_')}`;close('detailModal');$('chatTitle').textContent=`แชต: ${p.name}`;$('chatProduct').innerHTML=`<b>${esc(p.name)}</b> · ${esc(p.price)} บาท · ผู้ขาย ${esc(p.seller)}`;open('chatModal');loadMessages();markRead(chatConversation)}
+  function updateUnread(){if(!user){$('chatBadge').hidden=true;return}if(notifyUnsub)notifyUnsub();notifyUnsub=onSnapshot(query(MESSAGES,where('participantUids','array-contains',user.uid)),snap=>{const r=getReads();let n=0;for(const d of snap.docs){const m=d.data();if(m.senderUid!==user.uid&&(m.createdAt?.seconds||0)>(r[m.conversationId]||0))n++}$('chatBadge').textContent=n>99?'99+':n;$('chatBadge').hidden=n===0})}
+  function startChat(p,existingParticipants=null,existingId=null){if(!user){showToast('กรุณาเข้าสู่ระบบก่อน');return}if(p.uid===user.uid){showToast('เปิดกล่องแชทเพื่อดูคนที่ติดต่อคุณ');return}chatProduct=p;const requested=Array.isArray(existingParticipants)?existingParticipants:[];participants=(requested.length===2&&requested[0]!==requested[1]&&requested.includes(user.uid))?requested:[p.uid,user.uid];chatConversation=existingId||`${p.id}_${[p.uid,user.uid].sort().join('_')}`;close('detailModal');$('chatTitle').textContent=`แชต: ${p.name}`;$('chatProduct').innerHTML=`<b>${esc(p.name)}</b> · ${esc(p.price)} บาท · ผู้ขาย ${esc(p.seller)}`;open('chatModal');loadMessages();markRead(chatConversation)}
   function loadMessages(){if(chatUnsub)chatUnsub();$('messages').innerHTML='<div class="muted" style="text-align:center;padding:40px">กำลังโหลดข้อความ...</div>';if(!user||!chatConversation)return;const q=query(MESSAGES,where('participantUids','array-contains',user.uid),where('conversationId','==',chatConversation));chatUnsub=onSnapshot(q,snap=>{const arr=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));$('messages').innerHTML=arr.length?arr.map(m=>{const mine=m.senderUid===user.uid;const avatar=m.senderPhotoUrl?`<img class="avatar" src="${esc(m.senderPhotoUrl)}" alt="">`:'<span class="avatar" style="display:grid;place-items:center;background:var(--lav-soft)">👤</span>';return `<div class="msg ${mine?'mine':''}">${mine?'':avatar}<div><div class="msg-meta">${esc(m.senderName||m.senderEmail||'ผู้ใช้โรงเรียน')}</div><div class="bubble">${esc(m.text)}</div></div>${mine?avatar:''}</div>`}).join(''):'<div class="muted" style="text-align:center;padding:40px">เริ่มบทสนทนาได้เลย</div>';$('messages').scrollTop=$('messages').scrollHeight},e=>{$('messages').innerHTML=`<div class="muted" style="text-align:center;padding:40px">โหลดแชตไม่ได้: ${esc(e.code||e.message)}</div>`})}
   $('chatForm').onsubmit=async e=>{e.preventDefault();const text=$('chatInput').value.trim();if(!text||!user||participants.length!==2||!participants.includes(user.uid)||!chatProduct)return;const b=e.target.querySelector('button');b.disabled=true;try{await addDoc(MESSAGES,{conversationId:chatConversation,productId:chatProduct.id,sellerUid:chatProduct.uid,senderUid:user.uid,senderName:user.displayName||user.email,senderEmail:user.email||'',senderPhotoUrl:user.photoURL||'',participantUids:participants,text,createdAt:serverTimestamp()});$('chatInput').value=''}catch(x){showToast(`ส่งข้อความไม่สำเร็จ: ${x.code||x.message}`)}finally{b.disabled=false}};
 
@@ -139,31 +139,15 @@
         const latest=group.latest;
         if(!latest)continue;
         let p=products.find(x=>x.id===latest.productId);
-        if(!p){
-          try{
-            const s=await getDoc(doc(db,'products',latest.productId));
-            p=s.exists()?{id:s.id,...s.data()}:null;
-          }catch{p=null}
-        }
+        if(!p){try{const s=await getDoc(doc(db,'products',latest.productId));p=s.exists()?{id:s.id,...s.data()}:null}catch{p=null}}
         if(!p)continue;
         let part=[...group.participants];
         if(part.length!==2&&latest.sellerUid&&latest.sellerUid!==user.uid)part=[latest.sellerUid,user.uid];
         out.push({latest,p,participants:part});
       }
       out.sort((a,b)=>(b.latest.createdAt?.seconds||0)-(a.latest.createdAt?.seconds||0));
-      $('threads').innerHTML=out.length?out.map(({latest,p,participants})=>{
-        const av=latest.senderPhotoUrl?`<img class="thread-avatar" src="${esc(latest.senderPhotoUrl)}" alt="">`:'<span class="thread-avatar">👤</span>';
-        return `<div class="thread">${av}<div class="thread-main"><strong>${esc(latest.senderName||latest.senderEmail||'ผู้ใช้โรงเรียน')}</strong><span class="muted">${esc(p.name)} · ${esc(latest.text)}</span></div><button class="btn secondary open-thread" data-id="${esc(p.id)}" data-cid="${esc(latest.conversationId)}" data-part="${esc(JSON.stringify(participants))}">เปิด</button></div>`;
-      }).join(''):'<div class="empty">ยังไม่มีบทสนทนา</div>';
-      for(const b of $('threads').querySelectorAll('.open-thread')){
-        b.onclick=()=>{
-          let part=[];try{part=JSON.parse(b.dataset.part||'[]')}catch{part=[]}
-          const p=products.find(x=>x.id===b.dataset.id);
-          if(!p)return;
-          if(part.length!==2||part[0]===part[1]||!part.includes(user.uid)){showToast('บทสนทนานี้ไม่มีข้อมูลผู้ร่วมแชตครบ จึงยังเปิดไม่ได้');return}
-          startChat(p,part,b.dataset.cid);
-        };
-      }
+      $('threads').innerHTML=out.length?out.map(({latest,p,participants})=>{const av=latest.senderPhotoUrl?`<img class="thread-avatar" src="${esc(latest.senderPhotoUrl)}" alt="">`:'<span class="thread-avatar">👤</span>';return `<div class="thread">${av}<div class="thread-main"><strong>${esc(latest.senderName||latest.senderEmail||'ผู้ใช้โรงเรียน')}</strong><span class="muted">${esc(p.name)} · ${esc(latest.text)}</span></div><button class="btn secondary open-thread" data-id="${esc(p.id)}" data-cid="${esc(latest.conversationId)}" data-part="${esc(JSON.stringify(participants))}">เปิด</button></div>`}).join(''):'<div class="empty">ยังไม่มีบทสนทนา</div>';
+      for(const b of $('threads').querySelectorAll('.open-thread'))b.onclick=()=>{let part=[];try{part=JSON.parse(b.dataset.part||'[]')}catch{part=[]}const p=products.find(x=>x.id===b.dataset.id);if(!p)return;if(part.length!==2||part[0]===part[1]||!part.includes(user.uid)){showToast('บทสนทนานี้ไม่มีข้อมูลผู้ร่วมแชตครบ จึงยังเปิดไม่ได้');return}startChat(p,part,b.dataset.cid)};
     },e=>{$('threads').innerHTML=`<div class="empty">โหลดกล่องแชตไม่ได้: ${esc(e.code||e.message)}</div>`});
   }
   $('inboxBtn').onclick=()=>{open('inboxModal');loadInbox()};
@@ -176,7 +160,7 @@
   $('topSearch').oninput=e=>{search=e.target.value.trim();renderProducts()};$('heroSearchForm').onsubmit=e=>{e.preventDefault();search=$('heroSearch').value.trim();$('topSearch').value=search;renderProducts()};
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>close(b.dataset.close));document.querySelectorAll('.modal-bg').forEach(m=>m.onclick=e=>{if(e.target===m)close(m.id)});document.onkeydown=e=>{if(e.key==='Escape')document.querySelectorAll('.modal-bg.open').forEach(m=>m.classList.remove('open'))};
 
-  onAuthStateChanged(auth,async u=>{user=u||null;if(user&&!String(user.email||'').toLowerCase().endsWith('@triamudomsouth.ac.th')){await signOut(auth);showToast('อนุญาตเฉพาะอีเมลโรงเรียนเท่านั้น');return}if(user){$('loginBtn').hidden=true;$('userBox').hidden=false;$('inboxBtn').hidden=false;$('userAvatar').src=user.photoURL||'';$('userName').textContent=user.displayName||user.email; $('adminBtn').hidden=!isAdmin();try{await setDoc(doc(db,'users',user.uid),{displayName:user.displayName||user.email||'ผู้ใช้โรงเรียน',email:user.email||'',photoURL:user.photoURL||''},{merge:true})}catch(e){console.warn('Profile sync skipped',e)}updateUnread()}else{$('loginBtn').hidden=false;$('userBox').hidden=true;$('inboxBtn').hidden=true;$('adminBtn').hidden=true;if(notifyUnsub){notifyUnsub();notifyUnsub=null}if(inboxUnsub){inboxUnsub();inboxUnsub=null}if(chatUnsub){chatUnsub();chatUnsub=null}}});
+  onAuthStateChanged(auth,async u=>{user=u||null;if(user&&!String(user.email||'').toLowerCase().endsWith('@triamudomsouth.ac.th')){await signOut(auth);showToast('อนุญาตเฉพาะอีเมลโรงเรียนเท่านั้น');return}if(user){$('loginBtn').hidden=true;$('userBox').hidden=false;$('inboxBtn').hidden=false;$('userAvatar').src=user.photoURL||'';$('userName').textContent=user.displayName||user.email;$('adminBtn').hidden=!isAdmin();try{await setDoc(doc(db,'users',user.uid),{displayName:user.displayName||user.email||'ผู้ใช้โรงเรียน',email:user.email||'',photoURL:user.photoURL||''},{merge:true})}catch(e){console.warn('Profile sync skipped',e)}updateUnread()}else{$('loginBtn').hidden=false;$('userBox').hidden=true;$('inboxBtn').hidden=true;$('adminBtn').hidden=true;if(notifyUnsub){notifyUnsub();notifyUnsub=null}if(inboxUnsub){inboxUnsub();inboxUnsub=null}if(chatUnsub){chatUnsub();chatUnsub=null}}});
 
   renderCats();
   productUnsub=onSnapshot(query(PRODUCTS,where('approved','==',true)),snap=>{products=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));status(true,'ออนไลน์');renderProducts()},e=>{status(false,'เชื่อมต่อไม่ได้');$('grid').innerHTML=`<div class="empty">โหลดสินค้าไม่ได้: ${esc(e.code||e.message)}</div>`});
