@@ -16,12 +16,50 @@ if old_start not in text:
     raise SystemExit('Could not locate startChat guard')
 text = text.replace(old_start, new_start, 1)
 
+# The previous chat listener combined an array-contains constraint with a
+# conversationId equality constraint. Read access is already granted by the
+# participant constraint in Firestore Rules, so keep the server-side query to
+# that single constraint and filter conversationId in the browser. This also
+# avoids a composite-index/rules-query mismatch from breaking the chat box.
+start = text.find('  function loadMessages(){')
+end = text.find("  $('chatForm').onsubmit=", start)
+if start < 0 or end < 0:
+    raise SystemExit('Could not locate loadMessages boundaries')
+
+replacement_messages = '''  function loadMessages(){
+    if(chatUnsub)chatUnsub();
+    $('messages').innerHTML='<div class="muted" style="text-align:center;padding:40px">กำลังโหลดข้อความ...</div>';
+    if(!user||!chatConversation)return;
+    const q=query(MESSAGES,where('participantUids','array-contains',user.uid));
+    chatUnsub=onSnapshot(q,snap=>{
+      const rows=snap.docs.map(d=>({id:d.id,...d.data()}))
+        .filter(m=>m.conversationId===chatConversation)
+        .sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
+      if(!rows.length){
+        $('messages').innerHTML='<div class="muted" style="text-align:center;padding:40px">ยังไม่มีข้อความ เริ่มคุยกันได้เลย</div>';
+        return;
+      }
+      $('messages').innerHTML=rows.map(m=>{
+        const mine=m.senderUid===user.uid;
+        const avatar=m.senderPhotoUrl?`<img class="avatar" src="${esc(m.senderPhotoUrl)}" alt="">`:'';
+        const stamp=m.createdAt?.toDate?m.createdAt.toDate().toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'กำลังบันทึก...';
+        return `<div class="msg ${mine?'mine':''}">${mine?'':avatar}<div class="bubble"><div class="msg-meta">${esc(m.senderName||m.senderEmail||'ผู้ใช้')} · ${esc(stamp)}</div><div>${esc(m.text||'')}</div></div>${mine?avatar:''}</div>`;
+      }).join('');
+      $('messages').scrollTop=$('messages').scrollHeight;
+      markRead(chatConversation);
+    },e=>{
+      $('messages').innerHTML=`<div class="muted" style="text-align:center;padding:40px">โหลดแชตไม่ได้: ${esc(e.code||e.message)}</div>`;
+    });
+  }
+'''
+text = text[:start] + replacement_messages + text[end:]
+
 start = text.find('  function loadInbox(){')
 end = text.find("  $('inboxBtn').onclick=", start)
 if start < 0 or end < 0:
     raise SystemExit('Could not locate loadInbox boundaries')
 
-replacement = '''  function loadInbox(){
+replacement_inbox = '''  function loadInbox(){
     if(!user)return;
     if(inboxUnsub)inboxUnsub();
     $('threads').innerHTML='<div class="empty">กำลังโหลด...</div>';
@@ -71,5 +109,6 @@ replacement = '''  function loadInbox(){
     },e=>{$('threads').innerHTML=`<div class="empty">โหลดกล่องแชตไม่ได้: ${esc(e.code||e.message)}</div>`});
   }
 '''
-text = text[:start] + replacement + text[end:]
+text = text[:start] + replacement_inbox + text[end:]
+
 path.write_text(text, encoding='utf-8')
