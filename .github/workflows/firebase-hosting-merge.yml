@@ -23,117 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path('public/app.html')
-          text = path.read_text(encoding='utf-8')
-
-          # The .user class has display:flex, which can override the browser's
-          # default [hidden] rule. Force hidden auth controls to stay hidden.
-          if '[hidden]{display:none!important}' not in text:
-              text = text.replace(
-                  '    *{box-sizing:border-box} body{',
-                  '    *{box-sizing:border-box} [hidden]{display:none!important} body{',
-                  1,
-              )
-
-          # Replace inbox grouping so a thread keeps the union of participantUids
-          # from every message in that conversation. This fixes threads where the
-          # latest message was sent by the seller and therefore only contained the
-          # seller UID in legacy data.
-          pattern = re.compile(r'  function loadInbox\(\)\{.*?\n  \}\n  \$\(\x27inboxBtn\x27\)\.onclick=', re.S)
-          replacement = r'''  function loadInbox(){
-    if(!user)return;
-    if(inboxUnsub)inboxUnsub();
-    $('threads').innerHTML='<div class="empty">กำลังโหลด...</div>';
-    const q=query(MESSAGES,where('participantUids','array-contains',user.uid));
-    inboxUnsub=onSnapshot(q,async snap=>{
-      const by=new Map();
-      for(const d of snap.docs){
-        const m={id:d.id,...d.data()};
-        const key=m.conversationId;
-        const old=by.get(key)||{latest:null,participants:new Set()};
-        const list=Array.isArray(m.participantUids)?m.participantUids:[];
-        for(const uid of list)if(typeof uid==='string'&&uid)old.participants.add(uid);
-        if(typeof m.sellerUid==='string'&&m.sellerUid)old.participants.add(m.sellerUid);
-        if(!old.latest||(m.createdAt?.seconds||0)>(old.latest.createdAt?.seconds||0))old.latest=m;
-        by.set(key,old);
-      }
-
-      const out=[];
-      for(const group of by.values()){
-        const latest=group.latest;
-        if(!latest)continue;
-        let p=products.find(x=>x.id===latest.productId);
-        if(!p){
-          try{
-            const s=await getDoc(doc(db,'products',latest.productId));
-            p=s.exists()?{id:s.id,...s.data()}:null;
-          }catch{p=null}
-        }
-        if(!p)continue;
-
-        let part=[...group.participants];
-        // Safe fallback for newer buyer-side records that have sellerUid but
-        // incomplete participantUids. Never create a self-only thread.
-        if(part.length!==2 && latest.sellerUid && latest.sellerUid!==user.uid){
-          part=[latest.sellerUid,user.uid];
-        }
-        out.push({latest,p,participants:part});
-      }
-
-      out.sort((a,b)=>(b.latest.createdAt?.seconds||0)-(a.latest.createdAt?.seconds||0));
-      $('threads').innerHTML=out.length?out.map(({latest,p,participants})=>{
-        const av=latest.senderPhotoUrl
-          ?`<img class="thread-avatar" src="${esc(latest.senderPhotoUrl)}" alt="">`
-          :'<span class="thread-avatar">👤</span>';
-        const partJson=JSON.stringify(participants);
-        return `<div class="thread">
-          ${av}
-          <div class="thread-main">
-            <strong>${esc(latest.senderName||latest.senderEmail||'ผู้ใช้โรงเรียน')}</strong>
-            <span class="muted">${esc(p.name)} · ${esc(latest.text)}</span>
-          </div>
-          <button class="btn secondary open-thread"
-            data-id="${esc(p.id)}"
-            data-cid="${esc(latest.conversationId)}"
-            data-part="${esc(partJson)}">เปิด</button>
-        </div>`;
-      }).join(''):'<div class="empty">ยังไม่มีบทสนทนา</div>';
-
-      for(const b of $('threads').querySelectorAll('.open-thread')){
-        b.onclick=()=>{
-          let part=[];
-          try{part=JSON.parse(b.dataset.part||'[]')}catch{part=[]}
-          const p=products.find(x=>x.id===b.dataset.id);
-          if(!p)return;
-          if(part.length!==2||part[0]===part[1]||!part.includes(user.uid)){
-            showToast('บทสนทนานี้ไม่มีข้อมูลผู้ร่วมแชตครบ จึงยังเปิดไม่ได้');
-            return;
-          }
-          startChat(p,part,b.dataset.cid);
-        };
-      }
-    },e=>{
-      $('threads').innerHTML=`<div class="empty">โหลดกล่องแชตไม่ได้: ${esc(e.code||e.message)}</div>`;
-    });
-  }
-  $('inboxBtn').onclick='''
-          new_text,n=pattern.subn(replacement,text,count=1)
-          if n!=1:
-              raise SystemExit('Could not locate loadInbox function')
-          text=new_text
-
-          # Keep the direct-detail chat path strict and consistent.
-          text=text.replace(
-              "  function startChat(p,existingParticipants=null,existingId=null){if(!user){showToast('กรุณาเข้าสู่ระบบก่อน');return}if(p.uid===user.uid){showToast('เปิดกล่องแชทเพื่อดูคนที่ติดต่อคุณ');return}chatProduct=p;participants=existingParticipants||[p.uid,user.uid];chatConversation=existingId||`${p.id}_${[p.uid,user.uid].sort().join('_')};",
-              "  function startChat(p,existingParticipants=null,existingId=null){if(!user){showToast('กรุณาเข้าสู่ระบบก่อน');return}if(!p||!p.uid){showToast('ข้อมูลสินค้านี้ไม่สมบูรณ์');return}if(p.uid===user.uid){showToast('เปิดกล่องแชทเพื่อดูคนที่ติดต่อคุณ');return}const requested=Array.isArray(existingParticipants)?existingParticipants:[];participants=(requested.length===2&&requested[0]!==requested[1]&&requested.includes(user.uid))?requested:[p.uid,user.uid];if(participants.length!==2||participants[0]===participants[1]){showToast('ไม่สามารถระบุผู้ร่วมแชตได้');return}chatProduct=p;chatConversation=existingId||`${p.id}_${participants.slice().sort().join('_')}`;",
-          )
-
-          path.write_text(text,encoding='utf-8')
-          PY
+          python3 -c "from pathlib import Path; p=Path('public/app.html'); s=p.read_text(encoding='utf-8'); s=s.replace('    *{box-sizing:border-box} body{','    *{box-sizing:border-box} [hidden]{display:none!important} body{',1); s=s.replace('participants=existingParticipants||[p.uid,user.uid];','requested=Array.isArray(existingParticipants)?existingParticipants:[];participants=(requested.length===2&&requested[0]!==requested[1]&&requested.includes(user.uid))?requested:[p.uid,user.uid];',1); s=s.replace(\"if(part.length!==2||part[0]===part[1]||!part.includes(user.uid)){showToast('บทสนทนานี้ไม่มีข้อมูลผู้ร่วมแชตครบ จึงยังเปิดไม่ได้');return}\",\"if(part.length!==2||part[0]===part[1]||!part.includes(user.uid)){part=[p.uid,user.uid]}\",1); p.write_text(s,encoding='utf-8')"
 
       - name: Validate production files
         shell: bash
@@ -144,24 +34,7 @@ jobs:
           test -f firestore.indexes.json
           test -f public/index.html
           test -f public/app.html
-
-          python3 - <<'PY'
-          from pathlib import Path
-          import json
-          import re
-          import subprocess
-
-          source = Path('public/app.html').read_text(encoding='utf-8')
-          scripts = re.findall(r'<script\s+type=["\']module["\']>(.*?)</script>', source, flags=re.S)
-          if len(scripts) != 1:
-              raise SystemExit(f'Expected exactly one module script, found {len(scripts)}')
-          Path('/tmp/tus-market-app.mjs').write_text(scripts[0], encoding='utf-8')
-          subprocess.run(['node', '--check', '/tmp/tus-market-app.mjs'], check=True)
-
-          json.loads(Path('firebase.json').read_text(encoding='utf-8'))
-          json.loads(Path('firestore.indexes.json').read_text(encoding='utf-8'))
-          PY
-
+          python3 -c "import json,re,subprocess; from pathlib import Path; source=Path('public/app.html').read_text(encoding='utf-8'); scripts=re.findall(r'<script\\s+type=[\"\\']module[\"\\']>(.*?)</script>',source,re.S); assert len(scripts)==1, f'Expected exactly one module script, found {len(scripts)}'; Path('/tmp/tus-market-app.mjs').write_text(scripts[0],encoding='utf-8'); subprocess.run(['node','--check','/tmp/tus-market-app.mjs'],check=True); json.loads(Path('firebase.json').read_text(encoding='utf-8')); json.loads(Path('firestore.indexes.json').read_text(encoding='utf-8'))"
           git diff --check
 
       - name: Commit generated production fixes
@@ -173,7 +46,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add public/app.html
-            git commit -m "Fix chat thread routing and logged-out UI [skip ci]"
+            git commit -m "Fix chat routing and logged-out UI [skip ci]"
             git push origin HEAD:main
           fi
 
