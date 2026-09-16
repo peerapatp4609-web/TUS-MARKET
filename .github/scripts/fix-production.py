@@ -16,6 +16,14 @@ if old_start not in text:
     raise SystemExit('Could not locate startChat guard')
 text = text.replace(old_start, new_start, 1)
 
+# Always close the inbox before opening the chat modal. Otherwise the inbox
+# modal remains underneath the chat and looks like it failed to disappear.
+old_modal = "chatConversation=existingId||`${p.id}_${[p.uid,user.uid].sort().join('_')}`;close('detailModal');"
+new_modal = "chatConversation=existingId||`${p.id}_${[p.uid,user.uid].sort().join('_')}`;close('detailModal');close('inboxModal');"
+if old_modal not in text:
+    raise SystemExit('Could not locate chat modal transition')
+text = text.replace(old_modal, new_modal, 1)
+
 # The previous chat listener combined an array-contains constraint with a
 # conversationId equality constraint. Read access is already granted by the
 # participant constraint in Firestore Rules, so keep the server-side query to
