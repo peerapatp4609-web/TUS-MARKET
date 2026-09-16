@@ -7,6 +7,15 @@ text = path.read_text(encoding='utf-8')
 if '[hidden]{display:none!important}' not in text:
     text = text.replace('*{box-sizing:border-box} body{', '*{box-sizing:border-box} [hidden]{display:none!important} body{', 1)
 
+# When opening a conversation from the inbox, the product belongs to the
+# current user (the seller). Do not treat that as opening a chat with self;
+# the participant list identifies the actual other party.
+old_start = "function startChat(p,existingParticipants=null,existingId=null){if(!user){showToast('กรุณาเข้าสู่ระบบก่อน');return}if(p.uid===user.uid){showToast('เปิดกล่องแชทเพื่อดูคนที่ติดต่อคุณ');return}"
+new_start = "function startChat(p,existingParticipants=null,existingId=null){if(!user){showToast('กรุณาเข้าสู่ระบบก่อน');return}const hasConversationParticipants=Array.isArray(existingParticipants)&&existingParticipants.length===2&&existingParticipants[0]!==existingParticipants[1]&&existingParticipants.includes(user.uid);if(p.uid===user.uid&&!hasConversationParticipants){showToast('เปิดกล่องแชทเพื่อดูคนที่ติดต่อคุณ');return}"
+if old_start not in text:
+    raise SystemExit('Could not locate startChat guard')
+text = text.replace(old_start, new_start, 1)
+
 start = text.find('  function loadInbox(){')
 end = text.find("  $('inboxBtn').onclick=", start)
 if start < 0 or end < 0:
