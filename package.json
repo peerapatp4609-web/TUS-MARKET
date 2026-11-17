@@ -1,0 +1,27 @@
+{
+  "name": "tus-market",
+  "version": "1.0.0",
+  "description": "ตลาดนัดออนไลน์สำหรับนักเรียน TUS",
+  "main": "index.js",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-tus-market \"node --test tests/*.test.mjs\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peerapatp4609-web/TUS-MARKET.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/peerapatp4609-web/TUS-MARKET/issues"
+  },
+  "homepage": "https://github.com/peerapatp4609-web/TUS-MARKET#readme",
+  "private": true,
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-tools": "^14.27.0"
+  }
+}

@@ -19,10 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply production fixes
-        shell: bash
-        run: python3 .github/scripts/fix-production.py
-
       - name: Validate production files
         shell: bash
         run: |
@@ -49,10 +45,30 @@ jobs:
           PY
           git diff --check
 
-      - name: Deploy Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: actions/setup-node@v4
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TUS_MARKET }}
-          channelId: live
-          projectId: tus-market
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: npm ci
+
+      - name: Test Firestore permissions
+        run: npm test
+
+      - name: Deploy database rules, indexes, and Hosting
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TUS_MARKET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          credentials="$RUNNER_TEMP/firebase-service-account.json"
+          trap 'rm -f "$credentials"' EXIT
+          umask 077
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$credentials"
+          export GOOGLE_APPLICATION_CREDENTIALS="$credentials"
+          npx firebase deploy --only firestore,hosting --project tus-market --non-interactive

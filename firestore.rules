@@ -21,10 +21,12 @@ service cloud.firestore {
           isSchoolUser()
           && resource.data.uid == request.auth.uid
           && request.resource.data.uid == resource.data.uid
-          && request.resource.data.approved == resource.data.approved
+          && request.resource.data.approved == false
+          && request.resource.data.moderationStatus == 'pending_manual'
           && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.diff(resource).affectedKeys().hasOnly([
-            'name','price','cat','desc','seller','room','line','image'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name','price','cat','desc','seller','room','line','image',
+            'approved','moderationStatus'
           ])
           && validProduct(request.resource.data)
         )
@@ -68,15 +70,10 @@ service cloud.firestore {
           /databases/$(database)/documents/products/$(request.resource.data.productId)
         ).data.uid == request.resource.data.sellerUid;
 
-      // Firestore evaluates collection queries against the list rule.
-      // The chat UI filters messages by participant/conversation in the client.
-      // Individual document reads remain participant-only.
-      allow list: if isSchoolUser() || isAdmin();
-      allow get: if
+      allow get, list: if
         isAdmin()
         || (
           request.auth != null
-          && resource.data.participantUids is list
           && request.auth.uid in resource.data.participantUids
         );
 
