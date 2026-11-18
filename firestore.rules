@@ -56,8 +56,24 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow read: if isSchoolUser()
         && (request.auth.uid == resource.data.buyerUid || request.auth.uid == resource.data.sellerUid);
-      allow create: if isSchoolUser() && validNewOrder(request.resource.data);
+      allow create: if isSchoolUser() && validNewOrder(orderId, request.resource.data);
       allow update: if isSchoolUser() && validOrderUpdate(orderId);
+    }
+
+    match /orderRequests/{productId}/buyers/{buyerUid} {
+      allow get: if isSchoolUser() && request.auth.uid == buyerUid;
+      allow create: if isSchoolUser() && request.auth.uid == buyerUid
+        && linksNewOrder(productId, buyerUid);
+      allow update: if isSchoolUser() && request.auth.uid == buyerUid
+        && get(orderPath(resource.data.orderId)).data.status in ['cancelled','declined']
+        && linksNewOrder(productId, buyerUid);
+    }
+
+    function linksNewOrder(productId, buyerUid) {
+      let order = getAfter(orderPath(request.resource.data.orderId)).data;
+      return request.resource.data.keys().hasOnly(['orderId'])
+        && order.productId == productId && order.buyerUid == buyerUid
+        && order.status == 'pending' && order.createdAt == request.time;
     }
 
     function productPath(productId) {
@@ -79,14 +95,15 @@ service cloud.firestore {
         && product.price == order.price;
     }
 
-    function validNewOrder(data) {
+    function validNewOrder(orderId, data) {
       let fields = ['productId','productName','price','buyerUid','sellerUid','status','createdAt','updatedAt'];
       return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
         && data.buyerUid == request.auth.uid && data.buyerUid != data.sellerUid
         && data.productId is string && data.productId.size() <= 150 && data.productId.matches('[^/]+')
         && data.status == 'pending' && data.createdAt == request.time && data.updatedAt == request.time
         && isAvailable(get(productPath(data.productId)).data)
-        && matchesListing(data, get(productPath(data.productId)).data);
+        && matchesListing(data, get(productPath(data.productId)).data)
+        && getAfter(/databases/$(database)/documents/orderRequests/$(data.productId)/buyers/$(data.buyerUid)).data.orderId == orderId;
     }
 
     function validOrderUpdate(orderId) {

@@ -12,6 +12,7 @@ before(async()=>{
   await env.withSecurityRulesDisabled(async c=>{
     await setDoc(doc(c.firestore(),'products','book'),product);
     await setDoc(doc(c.firestore(),'products','orders-book'),product);
+    await setDoc(doc(c.firestore(),'products','privacy-book'),product);
     await setDoc(doc(c.firestore(),'messages','message'),{participantUids:['buyer','seller'],senderUid:'buyer',sellerUid:'seller',productId:'book',conversationId:'book_buyer_seller',text:'Hello'});
   });
 });
@@ -48,10 +49,17 @@ test('deleting product preserves access to conversation history',async()=>{
   await assertSucceeds(getDocs(query(collection(school('buyer'),'messages'),where('participantUids','array-contains','buyer'))));
 });
 
-const order = uid => ({
-  productId:'orders-book', productName:product.name, price:product.price, buyerUid:uid,
+const order = (uid, productId='orders-book') => ({
+  productId, productName:product.name, price:product.price, buyerUid:uid,
   sellerUid:'seller', status:'pending', createdAt:serverTimestamp(), updatedAt:serverTimestamp()
 });
+
+function placeOrder(db, id, data) {
+  const batch=writeBatch(db);
+  batch.set(doc(db,'orders',id),data);
+  batch.set(doc(db,'orderRequests',data.productId,'buyers',data.buyerUid),{orderId:id});
+  return batch.commit();
+}
 
 function moveOrder(db, id, status, saleStatus) {
   const batch = writeBatch(db);
@@ -66,18 +74,24 @@ test('orders keep the listing price and are private to verified buyer and seller
   const buyer=school('buyer');
   const seller=school('seller');
   const ref=doc(buyer,'orders','private-request');
-  await assertFails(setDoc(doc(school('buyer',false),'orders','unverified'),order('buyer')));
-  await assertFails(setDoc(doc(seller,'orders','self'),order('seller')));
-  await assertFails(setDoc(ref,{...order('buyer'),price:1}));
-  await assertFails(setDoc(ref,{...order('buyer'),sellerUid:'outsider'}));
-  await assertFails(setDoc(ref,{...order('buyer'),status:'accepted'}));
-  await assertSucceeds(setDoc(ref,order('buyer')));
+  const data=order('buyer','privacy-book');
+  await assertFails(placeOrder(school('buyer',false),'unverified',data));
+  await assertFails(placeOrder(seller,'self',order('seller','privacy-book')));
+  await assertFails(placeOrder(buyer,'private-request',{...data,price:1}));
+  await assertFails(placeOrder(buyer,'private-request',{...data,sellerUid:'outsider'}));
+  await assertFails(placeOrder(buyer,'private-request',{...data,status:'accepted'}));
+  await assertFails(setDoc(ref,data));
+  await assertSucceeds(placeOrder(buyer,'private-request',data));
+  await assertFails(placeOrder(buyer,'duplicate',data));
+  await assertFails(getDoc(doc(seller,'orderRequests','privacy-book','buyers','buyer')));
   await assertSucceeds(getDocs(query(collection(buyer,'orders'),where('buyerUid','==','buyer'))));
   await assertSucceeds(getDocs(query(collection(seller,'orders'),where('sellerUid','==','seller'))));
   await assertFails(getDoc(doc(school('outsider'),'orders','private-request')));
   await assertFails(getDocs(query(collection(school('outsider'),'orders'),where('buyerUid','==','buyer'))));
   await assertFails(getDoc(doc(school('11076'),'orders','private-request')));
   await assertFails(updateDoc(ref,{price:1,status:'cancelled',updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(ref,{status:'cancelled',updatedAt:serverTimestamp()}));
+  await assertSucceeds(placeOrder(buyer,'replacement',data));
 });
 
 test('one reservation per listing, with atomic release and completion', async()=>{
@@ -85,8 +99,8 @@ test('one reservation per listing, with atomic release and completion', async()=
   const other=school('other');
   const seller=school('seller');
   const productRef=doc(seller,'products','orders-book');
-  await assertSucceeds(setDoc(doc(buyer,'orders','request-a'),order('buyer')));
-  await assertSucceeds(setDoc(doc(other,'orders','request-b'),order('other')));
+  await assertSucceeds(placeOrder(buyer,'request-a',order('buyer')));
+  await assertSucceeds(placeOrder(other,'request-b',order('other')));
   await assertFails(moveOrder(buyer,'request-a','accepted','reserved'));
   await assertFails(moveOrder(seller,'request-a','accepted'));
   await assertFails(updateDoc(productRef,{saleStatus:'reserved',saleOrderId:'request-a'}));
@@ -98,7 +112,7 @@ test('one reservation per listing, with atomic release and completion', async()=
   await assertSucceeds(moveOrder(buyer,'request-a','cancelled','available'));
   await assertSucceeds(moveOrder(seller,'request-b','accepted','reserved'));
   await assertSucceeds(moveOrder(seller,'request-b','completed','sold'));
-  await assertFails(setDoc(doc(buyer,'orders','request-c'),order('buyer')));
+  await assertFails(placeOrder(buyer,'request-c',order('buyer')));
   await assertFails(moveOrder(seller,'request-b','cancelled','available'));
   const snapshot=await assertSucceeds(getDoc(productRef));
   if(snapshot.data().saleStatus!=='sold')throw new Error('Completed order must leave listing sold');

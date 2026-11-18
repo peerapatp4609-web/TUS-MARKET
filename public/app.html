@@ -139,10 +139,16 @@
     const buyerUid=user.uid;
     const orderRef=doc(ORDERS);
     const listing=doc(PRODUCTS,product.id);
+    const requestRef=doc(db,'orderRequests',product.id,'buyers',buyerUid);
     placingOrder=true;
     button.disabled=true;
     try{
-      await runTransaction(db,async transaction=>{
+      const created=await runTransaction(db,async transaction=>{
+        const previous=(await transaction.get(requestRef)).data();
+        if(previous){
+          const order=(await transaction.get(doc(ORDERS,previous.orderId))).data();
+          if(order && ['pending','accepted'].includes(order.status))return false;
+        }
         const snapshot=await transaction.get(listing);
         const current=snapshot.data();
         if(!current?.approved||saleStatus(current)!=='available')throw new Error('สินค้านี้ไม่พร้อมรับออเดอร์แล้ว');
@@ -152,11 +158,13 @@
           productId:product.id,productName:current.name,price:current.price,buyerUid,sellerUid:current.uid,
           status:'pending',createdAt:serverTimestamp(),updatedAt:serverTimestamp()
         });
+        transaction.set(requestRef,{orderId:orderRef.id});
+        return true;
       });
       if(user?.uid!==buyerUid)return;
       close('detailModal');
       openOrders();
-      showToast('ส่งคำขอซื้อแล้ว');
+      showToast(created?'ส่งคำขอซื้อแล้ว':'คุณมีออเดอร์สำหรับสินค้านี้อยู่แล้ว');
     }catch(error){
       showToast(error.code ? 'ส่งคำขอซื้อไม่สำเร็จ กรุณาตรวจสถานะสินค้าแล้วลองอีกครั้ง' : error.message);
     }finally{
