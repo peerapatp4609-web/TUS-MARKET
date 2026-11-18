@@ -3,17 +3,19 @@ name: Deploy TUS-MARKET to Firebase
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: tus-market-production
+  group: tus-market-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  validate-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,6 +63,7 @@ jobs:
         run: npm test
 
       - name: Deploy database rules, indexes, and Hosting
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_TUS_MARKET }}
         shell: bash

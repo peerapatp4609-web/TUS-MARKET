@@ -19,6 +19,8 @@
     footer{padding:34px 0 50px;color:var(--muted);font-size:.8rem;text-align:center}.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,15px);opacity:0;pointer-events:none;background:var(--ink);color:#fff;border-radius:999px;padding:11px 17px;z-index:200;transition:.2s;max-width:90%;text-align:center}.toast.show{opacity:1;transform:translate(-50%,0)}
     @media(max-width:950px){.grid{grid-template-columns:repeat(2,1fr)}.hero-grid{grid-template-columns:1fr}.search{max-width:330px}.user small{display:none}}
     @media(max-width:620px){.wrap{width:min(100% - 22px,1180px)}.bar{min-height:62px}.brand span{display:none}.search{display:none}.actions{margin-left:auto}.btn{padding:9px 10px;font-size:.8rem}.hero{padding:46px 0 38px}.hero h1{font-size:2.25rem}.board{grid-template-columns:1fr 1fr}.note{padding:14px;font-size:.82rem}.chips{gap:6px}.chip{font-size:.77rem;padding:8px 9px}.grid{gap:10px}.card{padding:10px}.card h3{font-size:.9rem}.row{grid-template-columns:1fr}.modal{padding:18px}.messages{height:320px}.split .btn{min-width:100%}}
+    .order-card{padding:14px;border:1px solid var(--line);border-radius:12px;overflow-wrap:anywhere}.order-card .split{margin-top:10px}.order-card strong{display:block}.order-section{margin-top:16px}.order-section h4{margin:0 0 8px}.order-status{font-weight:600;color:var(--lav)}.btn:disabled{cursor:wait;opacity:.55}
+    @media(max-width:620px){.bar{gap:6px;flex-wrap:wrap;padding-block:8px}.actions{gap:5px;flex-wrap:wrap;justify-content:flex-end}.actions .icon-btn{width:34px;height:34px}.user img{display:none}.hero-search input,.chat-form input{min-width:0}.order-card .split .btn{min-width:0}}
   </style>
 </head>
 <body>
@@ -29,6 +31,7 @@
   <div class="actions">
     <button id="loginBtn" class="btn ghost">เข้าสู่ระบบ</button>
     <button id="inboxBtn" class="icon-btn" hidden aria-label="กล่องแชท">💬<span id="chatBadge" class="badge" hidden>0</span></button>
+    <button id="ordersBtn" class="btn secondary" hidden>ออเดอร์</button>
     <button id="adminBtn" class="btn warn" hidden>แอดมิน</button>
     <button id="sellBtn" class="btn primary">+ ลงขาย</button>
     <div id="userBox" class="user" hidden><img id="userAvatar" alt=""><small id="userName"></small><button id="logoutBtn" class="btn ghost" style="padding:6px 8px">ออก</button></div>
@@ -52,7 +55,7 @@
 <footer>TUS Market · ระบบซื้อขายออนไลน์สำหรับนักเรียน</footer>
 
 <div id="detailModal" class="modal-bg"><div class="modal"><button class="close" data-close="detailModal">✕</button><h3 id="detailTitle"></h3><div id="detailBody"></div></div></div>
-<div id="sellModal" class="modal-bg"><div class="modal"><button class="close" data-close="sellModal">✕</button><h3>ลงขายสินค้า</h3><form id="sellForm" class="fields">
+<div id="sellModal" class="modal-bg"><div class="modal"><button class="close" data-close="sellModal">✕</button><h3>ลงขายสินค้า</h3><p><button id="myProductsBtn" class="btn secondary">สินค้าของฉัน</button></p><form id="sellForm" class="fields">
   <label class="field">ชื่อสินค้า<input name="name" maxlength="120" required></label>
   <div class="row"><label class="field">ราคา (บาท)<input name="price" type="number" min="0" max="1000000" step="0.01" required></label><label class="field">หมวดหมู่<select name="cat" id="sellCat"></select></label></div>
   <label class="field">รายละเอียด<textarea name="desc" maxlength="1000" placeholder="สภาพสินค้า จุดนัดรับ ฯลฯ"></textarea></label>
@@ -64,39 +67,220 @@
   <input type="hidden" name="id"><label class="field">ชื่อสินค้า<input name="name" maxlength="120" required></label>
   <div class="row"><label class="field">ราคา (บาท)<input name="price" type="number" min="0" max="1000000" step="0.01" required></label><label class="field">หมวดหมู่<select name="cat" id="editCat"></select></label></div>
   <label class="field">รายละเอียด<textarea name="desc" maxlength="1000"></textarea></label><div class="row"><label class="field">ชื่อผู้ขาย<input name="seller" maxlength="80" required></label><label class="field">ห้อง/ชั้น<input name="room" maxlength="40" required></label></div>
-  <label class="field">เปลี่ยนรูปภาพ<input id="editImage" type="file" accept="image/*"></label><div id="editPreview" class="preview"><img id="editPreviewImg" alt="ตัวอย่าง"></div><button class="btn warn">บันทึก</button>
+  <label class="field">เปลี่ยนรูปภาพ<input id="editImage" type="file" accept="image/*"></label><div id="editPreview" class="preview"><img id="editPreviewImg" alt="ตัวอย่าง"></div><button type="submit" class="btn warn">บันทึก</button>
 </form></div></div>
 <div id="chatModal" class="modal-bg"><div class="modal"><button class="close" data-close="chatModal">✕</button><h3 id="chatTitle">แชต</h3><div id="chatProduct" class="detail-box"></div><div id="messages" class="messages"></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength="500" placeholder="พิมพ์ข้อความ..." autocomplete="off" required><button class="btn primary">ส่ง</button></form></div></div>
 <div id="inboxModal" class="modal-bg"><div class="modal"><button class="close" data-close="inboxModal">✕</button><h3>กล่องแชท</h3><div id="threads" class="chat-list"></div></div></div>
+<div id="ordersModal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="ordersTitle"><div class="modal">
+  <button class="close" data-close="ordersModal" aria-label="ปิด">✕</button><h3 id="ordersTitle">ออเดอร์</h3>
+  <p class="muted">ตกลงจุดนัดรับผ่านแชต และชำระเงินกับผู้ขายเมื่อรับสินค้า</p>
+  <section class="order-section"><h4>คำขอที่ฉันส่ง</h4><div id="buyOrders" class="chat-list" aria-live="polite"></div></section>
+  <section class="order-section"><h4>คำขอที่ฉันได้รับ</h4><div id="sellOrders" class="chat-list" aria-live="polite"></div></section>
+</div></div>
+<div id="myProductsModal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="myProductsTitle"><div class="modal">
+  <button class="close" data-close="myProductsModal" aria-label="ปิด">✕</button><h3 id="myProductsTitle">สินค้าของฉัน</h3><div id="myProducts" class="chat-list" aria-live="polite"></div>
+</div></div>
 <div id="adminModal" class="modal-bg"><div class="modal"><button class="close" data-close="adminModal">✕</button><h3>จัดการสินค้ารออนุมัติ</h3><div class="split" style="margin-bottom:12px"><button id="approveAll" class="btn primary">อนุมัติทั้งหมด</button><button id="refreshAdmin" class="btn secondary">รีเฟรช</button></div><div id="pendingList" class="chat-list"></div></div></div>
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast" role="status"></div>
 
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, onSnapshot, query, where, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, setDoc, onSnapshot, query, where, serverTimestamp, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
   const firebaseConfig={apiKey:'AIzaSyCF9gXVh2T53sWcIl4udgVtGC9FrLNvOW4',authDomain:'tus-market.firebaseapp.com',projectId:'tus-market',storageBucket:'tus-market.firebasestorage.app',messagingSenderId:'988582645299',appId:'1:988582645299:web:78c06fb2af7808be661d46'};
   const app=initializeApp(firebaseConfig),db=getFirestore(app),auth=getAuth(app),provider=new GoogleAuthProvider();
   const ADMIN='11076@triamudomsouth.ac.th';
   const PRODUCTS=collection(db,'products'),MESSAGES=collection(db,'messages');
+  const ORDERS=collection(db,'orders');
   const CATS=[['all','ทั้งหมด','🛍️'],['food','อาหาร & ขนม','🍩'],['stationery','เครื่องเขียน','✏️'],['books','หนังสือ & การเรียน','📚'],['electronics','อิเล็กทรอนิกส์','💻'],['fashion','เสื้อผ้า รองเท้า & กระเป๋า','👕'],['beauty','ความงาม & เครื่องประดับ','💄'],['sports','กีฬา','⚽'],['games','เกม & ของเล่น','🎮'],['collectibles','ของสะสม','⭐'],['dorm','ของใช้ทั่วไป','🏠'],['tickets','บัตรกิจกรรม','🎟️'],['handmade','งานแฮนด์เมด','🧶'],['services','บริการ','🛠️'],['other','อื่นๆ','📦']];
   const catMap=Object.fromEntries(CATS.map(x=>[x[0],x]));
-  let user=null,products=[],filter='all',search='',selected=null,chatProduct=null,chatConversation='',participants=[],chatUnsub=null,inboxUnsub=null,productUnsub=null,notifyUnsub=null,uploadImage=null,editImage=null;
+  let user=null,products=[],filter='all',search='',chatProduct=null,chatConversation='',participants=[],chatUnsub=null,inboxUnsub=null,productUnsub=null,notifyUnsub=null,uploadImage=null,editImage=null;
+  let myProducts=[], myProductsUnsub=null, pendingUnsub=null, orderUnsubs=[];
+  let placingOrder=false;
 
   const $=id=>document.getElementById(id);
   const esc=v=>String(v??'').replace(/[&<>\'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const showToast=t=>{const x=$('toast');x.textContent=t;x.classList.add('show');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>x.classList.remove('show'),3000)};
-  const open=id=>$(id).classList.add('open');const close=id=>{$(id).classList.remove('open');if(id==='chatModal'&&chatUnsub){chatUnsub();chatUnsub=null}};
-  const isAdmin=()=>user?.email?.toLowerCase()===ADMIN;
+  const open=id=>$(id).classList.add('open');
+  function close(id){
+    $(id).classList.remove('open');
+    if(id==='chatModal' && chatUnsub){chatUnsub();chatUnsub=null}
+    if(id==='inboxModal' && inboxUnsub){inboxUnsub();inboxUnsub=null}
+    if(id==='adminModal' && pendingUnsub){pendingUnsub();pendingUnsub=null}
+    if(id==='ordersModal'){
+      for(const unsubscribe of orderUnsubs) unsubscribe();
+      orderUnsubs=[];
+    }
+  }
+  const isAdmin=()=>user?.emailVerified && user.email===ADMIN;
   const status=(ok,text)=>{$('status').className='status '+(ok?'online':'error');$('statusText').textContent=text};
 
   function renderCats(){ $('chips').innerHTML=CATS.map(([id,n,i])=>`<button class="chip ${filter===id?'active':''}" data-cat="${id}">${i} ${n}</button>`).join(''); for(const b of $('chips').querySelectorAll('[data-cat]')) b.onclick=()=>{filter=b.dataset.cat;renderCats();renderProducts()}; $('sellCat').innerHTML=CATS.slice(1).map(([id,n,i])=>`<option value="${id}">${i} ${n}</option>`).join('');$('editCat').innerHTML=$('sellCat').innerHTML; }
   function when(ts){if(!ts?.seconds)return 'เวลาไม่พร้อมใช้งาน';const d=new Date(ts.seconds*1000);return d.toLocaleString('th-TH',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
 
-  function renderProducts(){const grid=$('grid');let list=products.filter(p=>(filter==='all'||catMap[p.cat]?.[0]===filter)&&(!search||String(p.name||'').toLowerCase().includes(search.toLowerCase())));$('resultCount').textContent=`แสดง ${list.length} รายการ`;if(!list.length){grid.innerHTML='<div class="empty">ไม่พบสินค้าที่ค้นหา</div>';return}grid.innerHTML=list.map(p=>{const c=catMap[p.cat]||catMap.other;return `<article class="card"><div class="thumb">${p.image?`<img src="${esc(p.image)}" alt="${esc(p.name)}">`:c[2]}</div><h3>${esc(p.name)}</h3><div class="desc">${esc(p.desc||'ไม่มีรายละเอียดเพิ่มเติม')}</div><div class="price">${esc(p.price)} บาท</div><div class="seller">ผู้ขาย: ${esc(p.seller||'ไม่ระบุ')} · ${esc(p.room||'')}</div><button class="btn secondary detail" data-id="${esc(p.id)}">ดูรายละเอียด</button></article>`}).join('');for(const b of grid.querySelectorAll('.detail'))b.onclick=()=>showDetail(b.dataset.id)}
+  const saleStatus=p=>p.saleStatus||'available';
+  const saleLabel=p=>({reserved:'มีผู้จองแล้ว',sold:'ขายแล้ว'}[saleStatus(p)]||'');
+  const findProduct=id=>myProducts.find(p=>p.id===id)||products.find(p=>p.id===id);
+  const imageSource=value=>typeof value==='string' && /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(value) ? value : '';
+  const avatarSource=value=>typeof value==='string' && /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\//i.test(value) ? value : '';
 
-  function showDetail(id){selected=products.find(p=>p.id===id);if(!selected)return;const mine=user&&selected.uid===user.uid;const canEdit=mine||isAdmin();$('detailTitle').textContent=selected.name;$('detailBody').innerHTML=`${selected.image?`<img class="detail-image" src="${esc(selected.image)}" alt="${esc(selected.name)}">`:''}<div class="price" style="font-size:1.3rem">${esc(selected.price)} บาท</div><div class="detail-box"><b>ผู้ขาย:</b> ${esc(selected.seller)}<br><b>ห้อง:</b> ${esc(selected.room)}<br><b>หมวด:</b> ${esc((catMap[selected.cat]||catMap.other)[1])}<br><b>โพสต์:</b> ${esc(when(selected.createdAt))}</div><div class="detail-box">${esc(selected.desc||'ไม่มีรายละเอียดเพิ่มเติม')}</div><div class="split">${!mine?'<button id="startChat" class="btn primary">💬 แชตกับผู้ขาย</button>':''}${canEdit?'<button id="editItem" class="btn warn">✏️ แก้ไข</button><button id="deleteItem" class="btn danger">🗑️ ลบ</button>':''}</div>`;open('detailModal');$('startChat')?.addEventListener('click',()=>startChat(selected));$('editItem')?.addEventListener('click',()=>startEdit(selected));$('deleteItem')?.addEventListener('click',()=>deleteProduct(selected));}
+  const ORDER_LABELS={pending:'รอผู้ขายตอบรับ',accepted:'รับออเดอร์แล้ว · รอนัดรับ',declined:'ผู้ขายปฏิเสธ',cancelled:'ยกเลิกแล้ว',completed:'ส่งมอบแล้ว'};
+  const ORDER_ACTIONS={
+    accepted:{label:'รับออเดอร์',prompt:'รับออเดอร์และจองสินค้าชิ้นนี้ให้ผู้ซื้อหรือไม่?'},
+    declined:{label:'ปฏิเสธ',prompt:'ปฏิเสธออเดอร์นี้หรือไม่?'},
+    cancelled:{label:'ยกเลิก',prompt:'ยกเลิกออเดอร์นี้หรือไม่?'},
+    completed:{label:'ยืนยันส่งมอบ',prompt:'ยืนยันว่าผู้ซื้อรับสินค้าเรียบร้อยแล้วหรือไม่?'}
+  };
+
+  async function placeOrder(product, button){
+    if(!user){showToast('กรุณาเข้าสู่ระบบด้วยอีเมลโรงเรียน');return}
+    if(placingOrder || !confirm(`ส่งคำขอซื้อ ${product.name} ราคา ${product.price} บาท?`))return;
+    const buyerUid=user.uid;
+    const orderRef=doc(ORDERS);
+    const listing=doc(PRODUCTS,product.id);
+    placingOrder=true;
+    button.disabled=true;
+    try{
+      await runTransaction(db,async transaction=>{
+        const snapshot=await transaction.get(listing);
+        const current=snapshot.data();
+        if(!current?.approved||saleStatus(current)!=='available')throw new Error('สินค้านี้ไม่พร้อมรับออเดอร์แล้ว');
+        if(current.uid===buyerUid)throw new Error('ไม่สามารถสั่งซื้อสินค้าของตัวเอง');
+        if(current.name!==product.name||current.price!==product.price)throw new Error('ข้อมูลสินค้าเปลี่ยนแล้ว กรุณาเปิดรายละเอียดอีกครั้ง');
+        transaction.set(orderRef,{
+          productId:product.id,productName:current.name,price:current.price,buyerUid,sellerUid:current.uid,
+          status:'pending',createdAt:serverTimestamp(),updatedAt:serverTimestamp()
+        });
+      });
+      if(user?.uid!==buyerUid)return;
+      close('detailModal');
+      openOrders();
+      showToast('ส่งคำขอซื้อแล้ว');
+    }catch(error){
+      showToast(error.code ? 'ส่งคำขอซื้อไม่สำเร็จ กรุณาตรวจสถานะสินค้าแล้วลองอีกครั้ง' : error.message);
+    }finally{
+      placingOrder=false;
+      button.disabled=false;
+    }
+  }
+
+  async function changeOrder(order, next, button){
+    if(!confirm(ORDER_ACTIONS[next].prompt))return;
+    const orderRef=doc(ORDERS,order.id);
+    const listing=doc(PRODUCTS,order.productId);
+    button.disabled=true;
+    try{
+      await runTransaction(db,async transaction=>{
+        const current=(await transaction.get(orderRef)).data();
+        if(current?.status!==order.status)throw new Error('สถานะออเดอร์เปลี่ยนแล้ว');
+        if(next==='accepted'){
+          const product=(await transaction.get(listing)).data();
+          if(!product?.approved||saleStatus(product)!=='available')throw new Error('สินค้านี้ไม่พร้อมจองแล้ว');
+          if(product.name!==current.productName||product.price!==current.price)throw new Error('ข้อมูลสินค้าเปลี่ยนแล้ว ให้ปฏิเสธคำขอนี้และแจ้งผู้ซื้อ');
+          transaction.update(listing,{saleStatus:'reserved',saleOrderId:order.id});
+        }else if(current.status==='accepted'){
+          transaction.update(listing,next==='completed'
+            ? {saleStatus:'sold',saleOrderId:order.id}
+            : {saleStatus:'available',saleOrderId:null});
+        }
+        transaction.update(orderRef,{status:next,updatedAt:serverTimestamp()});
+      });
+      showToast(ORDER_LABELS[next]);
+    }catch(error){
+      showToast(error.code ? 'อัปเดตออเดอร์ไม่สำเร็จ กรุณาตรวจสถานะแล้วลองอีกครั้ง' : error.message);
+    }finally{
+      button.disabled=false;
+    }
+  }
+
+  function orderActions(order, selling){
+    if(order.status==='pending')return selling?['accepted','declined']:['cancelled'];
+    if(order.status==='accepted')return selling?['completed','cancelled']:['cancelled'];
+    return [];
+  }
+
+  function renderOrders(element, orders, selling){
+    element.innerHTML=orders.length?orders.map(order=>`
+      <article class="order-card">
+        <strong>${esc(order.productName)}</strong>
+        <div>${esc(order.price)} บาท · <span class="order-status">${esc(ORDER_LABELS[order.status]||order.status)}</span></div>
+        <div class="muted">${esc(when(order.createdAt))} · เลขออเดอร์ ${esc(order.id)}</div>
+        <div class="split">
+          ${orderActions(order,selling).map(action=>`<button class="btn ${['accepted','completed'].includes(action)?'primary':'secondary'}" data-order="${esc(order.id)}" data-action="${action}">${ORDER_ACTIONS[action].label}</button>`).join('')}
+          ${['pending','accepted'].includes(order.status)?`<button class="btn ghost" data-chat-order="${esc(order.id)}">แชตกับ${selling?'ผู้ซื้อ':'ผู้ขาย'}</button>`:''}
+        </div>
+      </article>`).join(''):'<div class="empty">ยังไม่มีออเดอร์</div>';
+    const byId=new Map(orders.map(order=>[order.id,order]));
+    for(const button of element.querySelectorAll('[data-order]')){
+      button.onclick=()=>changeOrder(byId.get(button.dataset.order),button.dataset.action,button);
+    }
+    for(const button of element.querySelectorAll('[data-chat-order]')){
+      button.onclick=()=>{
+        const order=byId.get(button.dataset.chatOrder);
+        const product=findProduct(order.productId);
+        if(!product){showToast('สินค้าไม่พร้อมใช้งาน เปิดประวัติได้จากกล่องแชท');return}
+        close('ordersModal');
+        startChat(product,[order.sellerUid,order.buyerUid]);
+      };
+    }
+  }
+
+  function openOrders(){
+    if(!user)return;
+    close('ordersModal');
+    open('ordersModal');
+    for(const [field,id] of [['buyerUid','buyOrders'],['sellerUid','sellOrders']]){
+      const element=$(id);
+      element.innerHTML='<div class="empty">กำลังโหลดออเดอร์...</div>';
+      orderUnsubs.push(onSnapshot(query(ORDERS,where(field,'==',user.uid)),snapshot=>{
+        const orders=snapshot.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>(b.createdAt?.toMillis()||0)-(a.createdAt?.toMillis()||0));
+        renderOrders(element,orders,field==='sellerUid');
+      },()=>{element.innerHTML='<div class="empty">โหลดออเดอร์ไม่ได้ กรุณาปิดแล้วเปิดใหม่</div>'}));
+    }
+  }
+
+  $('ordersBtn').onclick=openOrders;
+  $('myProductsBtn').onclick=()=>{close('sellModal');open('myProductsModal')};
+
+  function renderMyProducts(){
+    const element=$('myProducts');
+    element.innerHTML=myProducts.length?myProducts.map(product=>{
+      const label=saleLabel(product)||(product.approved?'เผยแพร่แล้ว':product.moderationStatus==='rejected'?'ไม่ผ่านการตรวจสอบ':'รอตรวจสอบ');
+      return `<article class="thread"><div class="thread-main"><strong>${esc(product.name)}</strong><span class="muted">${esc(label)} · ${esc(product.price)} บาท</span></div><button class="btn secondary" data-product="${esc(product.id)}">ดูสินค้า</button></article>`;
+    }).join(''):'<div class="empty">ยังไม่มีสินค้าของคุณ</div>';
+    for(const button of element.querySelectorAll('[data-product]')){
+      button.onclick=()=>{close('myProductsModal');showDetail(button.dataset.product)};
+    }
+  }
+
+  function renderProducts(){const grid=$('grid');let list=products.filter(p=>(filter==='all'||catMap[p.cat]?.[0]===filter)&&(!search||String(p.name||'').toLowerCase().includes(search.toLowerCase())));$('resultCount').textContent=`แสดง ${list.length} รายการ`;if(!list.length){grid.innerHTML='<div class="empty">ไม่พบสินค้าที่ค้นหา</div>';return}grid.innerHTML=list.map(p=>{const c=catMap[p.cat]||catMap.other;return `<article class="card"><div class="thumb">${imageSource(p.image)?`<img loading="lazy" src="${esc(imageSource(p.image))}" alt="${esc(p.name)}">`:c[2]}</div><h3>${esc(p.name)}</h3><div class="desc">${esc(p.desc||'ไม่มีรายละเอียดเพิ่มเติม')}</div><div class="price">${esc(p.price)} บาท${saleLabel(p)?` · ${saleLabel(p)}`:''}</div><div class="seller">ผู้ขาย: ${esc(p.seller||'ไม่ระบุ')} · ${esc(p.room||'')}</div><button class="btn secondary detail" data-id="${esc(p.id)}">ดูรายละเอียด</button></article>`}).join('');for(const b of grid.querySelectorAll('.detail'))b.onclick=()=>showDetail(b.dataset.id)}
+
+  function showDetail(id){
+    const product=findProduct(id);
+    if(!product)return;
+    const mine=product.uid===user?.uid;
+    const available=saleStatus(product)==='available';
+    const canEdit=available&&(mine||isAdmin());
+    const image=imageSource(product.image);
+    $('detailTitle').textContent=product.name;
+    $('detailBody').innerHTML=`
+      ${image?`<img class="detail-image" src="${esc(image)}" alt="${esc(product.name)}">`:''}
+      <div class="price" style="font-size:1.3rem">${esc(product.price)} บาท${saleLabel(product)?` · ${saleLabel(product)}`:''}</div>
+      <div class="detail-box"><b>ผู้ขาย:</b> ${esc(product.seller)}<br><b>ห้อง:</b> ${esc(product.room)}<br><b>หมวด:</b> ${esc((catMap[product.cat]||catMap.other)[1])}<br><b>โพสต์:</b> ${esc(when(product.createdAt))}</div>
+      <div class="detail-box">${esc(product.desc||'ไม่มีรายละเอียดเพิ่มเติม')}</div>
+      ${mine&&product.moderationStatus==='rejected'&&product.moderationReason?`<p class="muted">เหตุผลที่ไม่ผ่าน · ${esc(product.moderationReason)}</p>`:''}
+      <div class="split">
+        ${!mine&&product.approved&&available?'<button id="buyItem" class="btn primary">ส่งคำขอซื้อ</button>':''}
+        ${!mine&&product.approved?'<button id="startChat" class="btn secondary">แชตกับผู้ขาย</button>':''}
+        ${canEdit?'<button id="editItem" class="btn warn">แก้ไข</button><button id="deleteItem" class="btn danger">ลบ</button>':''}
+      </div>`;
+    open('detailModal');
+    $('buyItem')?.addEventListener('click',event=>placeOrder(product,event.currentTarget));
+    $('startChat')?.addEventListener('click',()=>startChat(product));
+    $('editItem')?.addEventListener('click',()=>startEdit(product));
+    $('deleteItem')?.addEventListener('click',()=>deleteProduct(product));
+  }
 
   async function resizeImage(file,max=720,q=.7){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(r.error);r.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{let w=img.width,h=img.height;if(Math.max(w,h)>max){if(w>=h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',q))};img.src=r.result};r.readAsDataURL(file)})}
   function validFile(f){if(!f)return true;if(!f.type.startsWith('image/')){showToast('กรุณาเลือกไฟล์รูปภาพ');return false}if(f.size>8*1024*1024){showToast('รูปภาพต้องไม่เกิน 8 MB');return false}return true}
@@ -106,9 +290,45 @@
   $('sellImage').onchange=async e=>{const f=e.target.files[0];if(!f||!validFile(f))return;try{uploadImage=await resizeImage(f);$('sellPreviewImg').src=uploadImage;$('sellPreview').style.display='block'}catch{showToast('ไม่สามารถประมวลผลรูปภาพ')}};
   $('sellForm').onsubmit=async e=>{e.preventDefault();if(!user)return;const fd=new FormData(e.target),d={name:String(fd.get('name')||'').trim(),price:Number(fd.get('price')),cat:String(fd.get('cat')||''),desc:String(fd.get('desc')||'').trim(),seller:String(fd.get('seller')||'').trim(),room:String(fd.get('room')||'').trim(),image:uploadImage||null};const err=validProduct(d);if(err){showToast(err);return}try{await addDoc(PRODUCTS,{...d,line:'',uid:user.uid,approved:false,moderationStatus:'pending_manual',createdAt:serverTimestamp()});close('sellModal');showToast('ส่งสินค้าเข้าตรวจสอบแล้ว') }catch(x){showToast(`ลงขายไม่สำเร็จ: ${x.code||x.message}`)}};
 
-  function startEdit(p){if(!user||(!isAdmin()&&p.uid!==user.uid))return;$('editForm').id.value=p.id;$('editForm').name.value=p.name||'';$('editForm').price.value=p.price||0;$('editForm').cat.value=p.cat||'other';$('editForm').desc.value=p.desc||'';$('editForm').seller.value=p.seller||'';$('editForm').room.value=p.room||'';editImage=null;if(p.image){$('editPreviewImg').src=p.image;$('editPreview').style.display='block'}else $('editPreview').style.display='none';close('detailModal');open('editModal')}
+  function startEdit(product){
+    if(!user||(!isAdmin()&&product.uid!==user.uid))return;
+    const fields=$('editForm').elements;
+    for(const field of ['id','name','price','cat','desc','seller','room']){
+      fields.namedItem(field).value=product[field]??'';
+    }
+    $('editImage').value='';
+    editImage=null;
+    const image=imageSource(product.image);
+    $('editPreviewImg').src=image;
+    $('editPreview').style.display=image?'block':'none';
+    close('detailModal');
+    open('editModal');
+  }
   $('editImage').onchange=async e=>{const f=e.target.files[0];if(!f||!validFile(f))return;try{editImage=await resizeImage(f);$('editPreviewImg').src=editImage;$('editPreview').style.display='block'}catch{showToast('ไม่สามารถประมวลผลรูปภาพ')}};
-  $('editForm').onsubmit=async e=>{e.preventDefault();const id=e.target.id.value,p=products.find(x=>x.id===id);if(!p||!user||(!isAdmin()&&p.uid!==user.uid))return;const d={name:String(e.target.name.value||'').trim(),price:Number(e.target.price.value),cat:e.target.cat.value,desc:String(e.target.desc.value||'').trim(),seller:String(e.target.seller.value||'').trim(),room:String(e.target.room.value||'').trim(),image:editImage||p.image||null,...(!isAdmin()?{approved:false,moderationStatus:'pending_manual'}:{})};const err=validProduct(d);if(err){showToast(err);return}try{await updateDoc(doc(db,'products',id),d);close('editModal');showToast(isAdmin()?'บันทึกการแก้ไขแล้ว':'บันทึกแล้ว ส่งสินค้าเข้าตรวจสอบอีกครั้ง')}catch(x){showToast(`แก้ไขไม่สำเร็จ: ${x.code||x.message}`)}};
+  $('editForm').onsubmit=async event=>{
+    event.preventDefault();
+    const form=event.currentTarget;
+    const values=new FormData(form);
+    const product=findProduct(String(values.get('id')));
+    if(!product||!user||(!isAdmin()&&product.uid!==user.uid))return;
+    const changes={
+      name:String(values.get('name')).trim(),price:Number(values.get('price')),cat:values.get('cat'),
+      desc:String(values.get('desc')).trim(),seller:String(values.get('seller')).trim(),
+      room:String(values.get('room')).trim(),image:editImage||product.image||null,
+      ...(!isAdmin()?{approved:false,moderationStatus:'pending_manual'}:{})
+    };
+    const error=validProduct(changes);
+    if(error){showToast(error);return}
+    const button=form.querySelector('button[type="submit"]');
+    if(button.disabled)return;
+    button.disabled=true;
+    try{
+      await updateDoc(doc(PRODUCTS,product.id),changes);
+      close('editModal');
+      showToast(isAdmin()?'บันทึกการแก้ไขแล้ว':'บันทึกแล้ว ส่งสินค้าเข้าตรวจสอบอีกครั้ง');
+    }catch(error){showToast('แก้ไขไม่สำเร็จ กรุณาตรวจสถานะสินค้าแล้วลองอีกครั้ง')}
+    finally{button.disabled=false}
+  };
   async function deleteProduct(p){if(!confirm('ลบสินค้านี้ใช่ไหม?'))return;try{await deleteDoc(doc(db,'products',p.id));close('detailModal');showToast('ลบสินค้าแล้ว')}catch(x){showToast(`ลบไม่สำเร็จ: ${x.code||x.message}`)}}
 
   function getReads(){try{return JSON.parse(localStorage.getItem(`tusReads:${user?.uid}`)||'{}')}catch{return{}}}function markRead(cid){if(!user)return;const r=getReads();r[cid]=Math.floor(Date.now()/1000);localStorage.setItem(`tusReads:${user.uid}`,JSON.stringify(r));updateUnread()}
@@ -118,10 +338,11 @@
     if(chatUnsub)chatUnsub();
     $('messages').innerHTML='<div class="muted" style="text-align:center;padding:40px">กำลังโหลดข้อความ...</div>';
     if(!user||!chatConversation)return;
-    const q=query(MESSAGES,where('participantUids','array-contains',user.uid));
+    const q=query(MESSAGES,where('participantUids','array-contains',user.uid),where('conversationId','==',chatConversation));
     chatUnsub=onSnapshot(q,snap=>{
-      const rows=snap.docs.map(d=>({id:d.id,...d.data()}))
-        .filter(m=>m.conversationId===chatConversation)
+      const rows=snap.docs.map(d=>({...d.data(),id:d.id}))
+        .filter(m=>m.productId===chatProduct.id && Array.isArray(m.participantUids)
+          && participants.every(uid=>m.participantUids.includes(uid)))
         .sort((a,b)=>(a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
       if(!rows.length){
         $('messages').innerHTML='<div class="muted" style="text-align:center;padding:40px">ยังไม่มีข้อความ เริ่มคุยกันได้เลย</div>';
@@ -129,7 +350,7 @@
       }
       $('messages').innerHTML=rows.map(m=>{
         const mine=m.senderUid===user.uid;
-        const avatar=m.senderPhotoUrl?`<img class="avatar" src="${esc(m.senderPhotoUrl)}" alt="">`:'';
+        const avatar=avatarSource(m.senderPhotoUrl)?`<img class="avatar" src="${esc(avatarSource(m.senderPhotoUrl))}" alt="">`:'';
         const stamp=m.createdAt?.toDate?m.createdAt.toDate().toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):'กำลังบันทึก...';
         return `<div class="msg ${mine?'mine':''}">${mine?'':avatar}<div class="bubble"><div class="msg-meta">${esc(m.senderName||m.senderEmail||'ผู้ใช้')} · ${esc(stamp)}</div><div>${esc(m.text||'')}</div></div>${mine?avatar:''}</div>`;
       }).join('');
@@ -146,10 +367,13 @@
     if(inboxUnsub)inboxUnsub();
     $('threads').innerHTML='<div class="empty">กำลังโหลด...</div>';
     const q=query(MESSAGES,where('participantUids','array-contains',user.uid));
+    const uid=user.uid;
+    let revision=0;
     inboxUnsub=onSnapshot(q,async snap=>{
+      const currentRevision=++revision;
       const by=new Map();
       for(const d of snap.docs){
-        const m={id:d.id,...d.data()};
+        const m={...d.data(),id:d.id};
         const key=m.conversationId;
         const old=by.get(key)||{latest:null,participants:new Set()};
         const list=Array.isArray(m.participantUids)?m.participantUids:[];
@@ -166,23 +390,24 @@
         if(!p){
           try{
             const s=await getDoc(doc(db,'products',latest.productId));
-            p=s.exists()?{id:s.id,...s.data()}:null;
+            p=s.exists()?{...s.data(),id:s.id}:null;
           }catch{p=null}
         }
         if(!p)p={id:latest.productId,uid:latest.sellerUid,name:'สินค้าไม่พร้อมจำหน่าย',seller:'ผู้ขาย',price:0,unavailable:true};
         let part=[...group.participants];
-        if(part.length!==2&&latest.sellerUid&&latest.sellerUid!==user.uid)part=[latest.sellerUid,user.uid];
+        if(part.length!==2&&latest.sellerUid&&latest.sellerUid!==uid)part=[latest.sellerUid,uid];
         out.push({latest,p,participants:part});
       }
+      if(user?.uid!==uid||!inboxUnsub||currentRevision!==revision)return;
       out.sort((a,b)=>(b.latest.createdAt?.seconds||0)-(a.latest.createdAt?.seconds||0));
       $('threads').innerHTML=out.length?out.map(({latest,p,participants})=>{
-        const av=latest.senderPhotoUrl?`<img class="thread-avatar" src="${esc(latest.senderPhotoUrl)}" alt="">`:'<span class="thread-avatar">👤</span>';
+        const av=avatarSource(latest.senderPhotoUrl)?`<img class="thread-avatar" src="${esc(avatarSource(latest.senderPhotoUrl))}" alt="">`:'<span class="thread-avatar">👤</span>';
         return `<div class="thread">${av}<div class="thread-main"><strong>${esc(latest.senderName||latest.senderEmail||'ผู้ใช้โรงเรียน')}</strong><span class="muted">${esc(p.name)} · ${esc(latest.text)}</span></div><button class="btn secondary open-thread" data-id="${esc(p.id)}" data-cid="${esc(latest.conversationId)}" data-part="${esc(JSON.stringify(participants))}">เปิด</button></div>`;
       }).join(''):'<div class="empty">ยังไม่มีบทสนทนา</div>';
       for(const b of $('threads').querySelectorAll('.open-thread')){
         b.onclick=()=>{
           let part=[];try{part=JSON.parse(b.dataset.part||'[]')}catch{part=[]}
-          const p=out.find(x=>x.p.id===b.dataset.id)?.p;
+          const p=out.find(x=>x.p.id===b.dataset.id&&x.latest.conversationId===b.dataset.cid)?.p;
           if(!p)return;
           if(part.length!==2||part[0]===part[1]||!part.includes(user.uid)){showToast('บทสนทนานี้ไม่มีข้อมูลผู้ร่วมแชตครบ จึงยังเปิดไม่ได้');return}
           startChat(p,part,b.dataset.cid);
@@ -192,7 +417,7 @@
   }
   $('inboxBtn').onclick=()=>{open('inboxModal');loadInbox()};
 
-  async function loadPending(){if(!isAdmin())return;$('pendingList').innerHTML='<div class="empty">กำลังโหลด...</div>';const q=query(PRODUCTS,where('approved','==',false));onSnapshot(q,snap=>{const arr=snap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>p.moderationStatus!=='rejected').sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));$('pendingList').innerHTML=arr.length?arr.map(p=>`<div class="thread"><div class="thread-main"><strong>${esc(p.name)}</strong><span class="muted">${esc(p.seller)} · ${esc(p.price)} บาท</span><span class="muted">${esc(p.desc||'ไม่มีรายละเอียด')}</span></div><div class="split"><button class="btn primary approve" data-id="${esc(p.id)}">อนุมัติ</button><button class="btn danger reject" data-id="${esc(p.id)}">ปฏิเสธ</button></div></div>`).join(''):'<div class="empty">ไม่มีสินค้ารออนุมัติ</div>';for(const b of $('pendingList').querySelectorAll('.approve'))b.onclick=()=>review(b.dataset.id,true);for(const b of $('pendingList').querySelectorAll('.reject'))b.onclick=()=>review(b.dataset.id,false)},e=>$('pendingList').innerHTML=`<div class="empty">โหลดรายการไม่ได้: ${esc(e.code||e.message)}</div>`)}
+  async function loadPending(){if(!isAdmin())return;$('pendingList').innerHTML='<div class="empty">กำลังโหลด...</div>';const q=query(PRODUCTS,where('approved','==',false));if(pendingUnsub)pendingUnsub();pendingUnsub=onSnapshot(q,snap=>{const arr=snap.docs.map(d=>({...d.data(),id:d.id})).filter(p=>p.moderationStatus!=='rejected').sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));$('pendingList').innerHTML=arr.length?arr.map(p=>`<div class="thread"><div class="thread-main"><strong>${esc(p.name)}</strong><span class="muted">${esc(p.seller)} · ${esc(p.price)} บาท</span><span class="muted">${esc(p.desc||'ไม่มีรายละเอียด')}</span></div><div class="split"><button class="btn primary approve" data-id="${esc(p.id)}">อนุมัติ</button><button class="btn danger reject" data-id="${esc(p.id)}">ปฏิเสธ</button></div></div>`).join(''):'<div class="empty">ไม่มีสินค้ารออนุมัติ</div>';for(const b of $('pendingList').querySelectorAll('.approve'))b.onclick=()=>review(b.dataset.id,true);for(const b of $('pendingList').querySelectorAll('.reject'))b.onclick=()=>review(b.dataset.id,false)},e=>$('pendingList').innerHTML=`<div class="empty">โหลดรายการไม่ได้: ${esc(e.code||e.message)}</div>`)}
   async function review(id,ok){try{let reason='';if(!ok){reason=(prompt('เหตุผลที่ปฏิเสธสินค้า')||'').trim();if(!reason)return}await updateDoc(doc(db,'products',id),{approved:ok,moderationStatus:ok?'approved':'rejected',moderationReason:reason,reviewedAt:serverTimestamp(),reviewedBy:user.uid});showToast(ok?'อนุมัติแล้ว':'ปฏิเสธแล้ว')}catch(e){showToast(`บันทึกไม่สำเร็จ: ${e.code||e.message}`)}}
   $('approveAll').onclick=async()=>{const bs=[...$('pendingList').querySelectorAll('.approve')];if(!bs.length){showToast('ไม่มีสินค้ารออนุมัติ');return}if(!confirm(`อนุมัติ ${bs.length} รายการ?`))return;for(const b of bs){try{await review(b.dataset.id,true)}catch{}}};$('refreshAdmin').onclick=()=>loadPending();$('adminBtn').onclick=()=>{open('adminModal');loadPending()};
 
@@ -200,10 +425,43 @@
   $('topSearch').oninput=e=>{search=e.target.value.trim();renderProducts()};$('heroSearchForm').onsubmit=e=>{e.preventDefault();search=$('heroSearch').value.trim();$('topSearch').value=search;renderProducts()};
   document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>close(b.dataset.close));document.querySelectorAll('.modal-bg').forEach(m=>m.onclick=e=>{if(e.target===m)close(m.id)});document.onkeydown=e=>{if(e.key==='Escape')document.querySelectorAll('.modal-bg.open').forEach(m=>close(m.id))};
 
-  onAuthStateChanged(auth,async u=>{user=u||null;if(user&&!String(user.email||'').toLowerCase().endsWith('@triamudomsouth.ac.th')){await signOut(auth);showToast('อนุญาตเฉพาะอีเมลโรงเรียนเท่านั้น');return}if(user){$('loginBtn').hidden=true;$('userBox').hidden=false;$('inboxBtn').hidden=false;$('userAvatar').src=user.photoURL||'';$('userName').textContent=user.displayName||user.email;$('adminBtn').hidden=!isAdmin();try{await setDoc(doc(db,'users',user.uid),{displayName:user.displayName||user.email||'ผู้ใช้โรงเรียน',email:user.email||'',photoURL:user.photoURL||''},{merge:true})}catch(e){console.warn('Profile sync skipped',e)}updateUnread()}else{$('loginBtn').hidden=false;$('userBox').hidden=true;$('inboxBtn').hidden=true;$('adminBtn').hidden=true;if(notifyUnsub){notifyUnsub();notifyUnsub=null}if(inboxUnsub){inboxUnsub();inboxUnsub=null}if(chatUnsub){chatUnsub();chatUnsub=null}}});
+  onAuthStateChanged(auth,async account=>{
+    document.querySelectorAll('.modal-bg.open').forEach(modal=>close(modal.id));
+    for(const unsubscribe of [notifyUnsub,inboxUnsub,chatUnsub,pendingUnsub,myProductsUnsub]) unsubscribe?.();
+    notifyUnsub=inboxUnsub=chatUnsub=pendingUnsub=myProductsUnsub=null;
+    myProducts=[];
+    chatProduct=null;
+    participants=[];
+    chatConversation='';
+    for(const id of ['messages','threads','pendingList','myProducts','buyOrders','sellOrders']) $(id).textContent='';
+    $('chatInput').value='';
+    $('chatBadge').hidden=true;
+    const schoolAccount=account?.emailVerified&&account.email?.endsWith('@triamudomsouth.ac.th');
+    user=schoolAccount?account:null;
+    $('loginBtn').hidden=!!user;
+    for(const id of ['userBox','inboxBtn','ordersBtn']) $(id).hidden=!user;
+    $('adminBtn').hidden=!isAdmin();
+    if(!user){
+      if(account){
+        await signOut(auth);
+        showToast('กรุณาใช้อีเมลโรงเรียนที่ยืนยันแล้ว');
+      }
+      return;
+    }
+    $('userAvatar').src=avatarSource(user.photoURL);
+    $('userName').textContent=user.displayName||user.email;
+    myProductsUnsub=onSnapshot(query(PRODUCTS,where('uid','==',user.uid)),snapshot=>{
+      myProducts=snapshot.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+      renderMyProducts();
+    },()=>{$('myProducts').textContent='โหลดสินค้าของคุณไม่ได้ กรุณาเข้าสู่ระบบอีกครั้ง'});
+    updateUnread();
+    const profile={displayName:(user.displayName||user.email).slice(0,120),email:user.email,photoURL:avatarSource(user.photoURL)};
+    try{await setDoc(doc(db,'users',user.uid),profile,{merge:true})}
+    catch(error){console.warn('Profile sync skipped',error)}
+  });
 
   renderCats();
-  productUnsub=onSnapshot(query(PRODUCTS,where('approved','==',true)),snap=>{products=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));status(true,'ออนไลน์');renderProducts()},e=>{status(false,'เชื่อมต่อไม่ได้');$('grid').innerHTML=`<div class="empty">โหลดสินค้าไม่ได้: ${esc(e.code||e.message)}</div>`});
+  productUnsub=onSnapshot(query(PRODUCTS,where('approved','==',true)),snap=>{products=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));status(true,'ออนไลน์');renderProducts()},e=>{status(false,'เชื่อมต่อไม่ได้');$('grid').innerHTML=`<div class="empty">โหลดสินค้าไม่ได้: ${esc(e.code||e.message)}</div>`});
 </script>
 </body>
 </html>

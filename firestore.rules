@@ -6,7 +6,7 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if
         resource.data.approved == true
-        || (request.auth != null && resource.data.uid == request.auth.uid)
+        || (isSchoolUser() && resource.data.uid == request.auth.uid)
         || isAdmin();
 
       allow create: if
@@ -14,9 +14,15 @@ service cloud.firestore {
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.approved == false
         && request.resource.data.moderationStatus == 'pending_manual'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.keys().hasOnly([
+          'name','price','cat','desc','seller','room','line','image','uid','createdAt',
+          'approved','moderationStatus'
+        ])
         && validProduct(request.resource.data);
 
       allow update: if
+        (isAvailable(resource.data) && (
         (
           isSchoolUser()
           && resource.data.uid == request.auth.uid
@@ -35,18 +41,113 @@ service cloud.firestore {
           isAdmin()
           && request.resource.data.uid == resource.data.uid
           && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.data.approved is bool
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name','price','cat','desc','seller','room','line','image',
+            'approved','moderationStatus','moderationReason','reviewedAt','reviewedBy'
+          ])
           && validProduct(request.resource.data)
-        );
+        ))) || validSaleChange(productId);
 
       allow delete: if
-        (isSchoolUser() && resource.data.uid == request.auth.uid)
-        || isAdmin();
+        isAvailable(resource.data)
+        && ((isSchoolUser() && resource.data.uid == request.auth.uid) || isAdmin());
+    }
+
+    match /orders/{orderId} {
+      allow read: if isSchoolUser()
+        && (request.auth.uid == resource.data.buyerUid || request.auth.uid == resource.data.sellerUid);
+      allow create: if isSchoolUser() && validNewOrder(request.resource.data);
+      allow update: if isSchoolUser() && validOrderUpdate(orderId);
+    }
+
+    function productPath(productId) {
+      return /databases/$(database)/documents/products/$(productId);
+    }
+
+    function orderPath(orderId) {
+      return /databases/$(database)/documents/orders/$(orderId);
+    }
+
+    function isAvailable(product) {
+      return product.get('saleStatus', 'available') == 'available';
+    }
+
+    function matchesListing(order, product) {
+      return product.approved == true
+        && product.uid == order.sellerUid
+        && product.name == order.productName
+        && product.price == order.price;
+    }
+
+    function validNewOrder(data) {
+      let fields = ['productId','productName','price','buyerUid','sellerUid','status','createdAt','updatedAt'];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields)
+        && data.buyerUid == request.auth.uid && data.buyerUid != data.sellerUid
+        && data.productId is string && data.productId.size() <= 150 && data.productId.matches('[^/]+')
+        && data.status == 'pending' && data.createdAt == request.time && data.updatedAt == request.time
+        && isAvailable(get(productPath(data.productId)).data)
+        && matchesListing(data, get(productPath(data.productId)).data);
+    }
+
+    function validOrderUpdate(orderId) {
+      let previous = resource.data;
+      let next = request.resource.data;
+      let seller = request.auth.uid == previous.sellerUid;
+      let buyer = request.auth.uid == previous.buyerUid;
+      return next.diff(previous).affectedKeys().hasOnly(['status','updatedAt'])
+        && next.updatedAt == request.time && (seller || buyer)
+        && (
+          (previous.status == 'pending' && (
+            (next.status == 'cancelled' && buyer)
+            || (next.status == 'declined' && seller)
+            || (next.status == 'accepted' && seller && acceptListing(previous, orderId))
+          ))
+          || (previous.status == 'accepted' && finishListing(previous, next.status, orderId, seller))
+        );
+    }
+
+    function acceptListing(order, orderId) {
+      let before = get(productPath(order.productId)).data;
+      let after = getAfter(productPath(order.productId)).data;
+      return isAvailable(before) && matchesListing(order, before)
+        && after.saleStatus == 'reserved' && after.saleOrderId == orderId;
+    }
+
+    function finishListing(order, status, orderId, seller) {
+      let before = get(productPath(order.productId)).data;
+      let after = getAfter(productPath(order.productId)).data;
+      return before.saleStatus == 'reserved' && before.saleOrderId == orderId
+        && ((status == 'cancelled' && after.saleStatus == 'available' && after.saleOrderId == null)
+          || (status == 'completed' && seller && after.saleStatus == 'sold' && after.saleOrderId == orderId));
+    }
+
+    function validSaleChange(productId) {
+      let before = resource.data;
+      let after = request.resource.data;
+      return isSchoolUser() && after.diff(before).affectedKeys().hasOnly(['saleStatus','saleOrderId'])
+        && ((isAvailable(before) && after.get('saleStatus', 'available') == 'reserved' && after.saleOrderId is string
+            && saleOrderChanges(productId, after.saleOrderId, 'pending', 'accepted'))
+          || (before.get('saleStatus', 'available') == 'reserved' && (
+            (after.saleStatus == 'available' && after.saleOrderId == null
+              && saleOrderChanges(productId, before.saleOrderId, 'accepted', 'cancelled'))
+            || (after.saleStatus == 'sold' && after.saleOrderId == before.saleOrderId
+              && saleOrderChanges(productId, before.saleOrderId, 'accepted', 'completed'))
+          )));
+    }
+
+    function saleOrderChanges(productId, orderId, previous, next) {
+      let before = get(orderPath(orderId)).data;
+      let after = getAfter(orderPath(orderId)).data;
+      return before.productId == productId && before.status == previous && after.status == next;
     }
 
     match /messages/{messageId} {
       allow create: if
         isSchoolUser()
+        && request.resource.data.keys().hasOnly([
+          'senderUid','senderEmail','senderName','senderPhotoUrl','productId','conversationId',
+          'sellerUid','text','participantUids','createdAt'
+        ])
         && request.resource.data.senderUid == request.auth.uid
         && request.resource.data.senderEmail == request.auth.token.email
         && request.resource.data.senderEmail is string
@@ -61,11 +162,16 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 500
         && request.resource.data.participantUids is list
         && request.resource.data.participantUids.size() == 2
+        && request.resource.data.participantUids[0] is string
+        && request.resource.data.participantUids[1] is string
         && request.resource.data.participantUids[0] != request.resource.data.participantUids[1]
         && request.auth.uid in request.resource.data.participantUids
         && request.resource.data.sellerUid in request.resource.data.participantUids
-        && request.resource.data.createdAt is timestamp
-        && (request.resource.data.senderPhotoUrl == null || request.resource.data.senderPhotoUrl is string)
+        && validConversation(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && (request.resource.data.senderPhotoUrl == null || (
+          request.resource.data.senderPhotoUrl is string && request.resource.data.senderPhotoUrl.size() <= 2048
+        ))
         && get(
           /databases/$(database)/documents/products/$(request.resource.data.productId)
         ).data.uid == request.resource.data.sellerUid;
@@ -73,7 +179,7 @@ service cloud.firestore {
       allow get, list: if
         isAdmin()
         || (
-          request.auth != null
+          isSchoolUser()
           && request.auth.uid in resource.data.participantUids
         );
 
@@ -82,7 +188,7 @@ service cloud.firestore {
       allow delete: if
         isAdmin()
         || (
-          request.auth != null
+          isSchoolUser()
           && resource.data.participantUids is list
           && request.auth.uid in resource.data.participantUids
           && resource.data.senderUid == request.auth.uid
@@ -90,26 +196,38 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if isSchoolUser() && request.auth.uid == userId;
       allow create, update: if
-        request.auth != null
+        isSchoolUser()
         && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['email','displayName','photoURL'])
         && request.resource.data.email == request.auth.token.email
         && request.resource.data.email is string
         && request.resource.data.displayName is string
         && request.resource.data.displayName.size() > 0
         && request.resource.data.displayName.size() <= 120
-        && (request.resource.data.photoURL == null || request.resource.data.photoURL is string);
+        && (request.resource.data.photoURL == null || (
+          request.resource.data.photoURL is string && request.resource.data.photoURL.size() <= 2048
+        ));
+    }
+
+    function validConversation(message) {
+      let a = message.participantUids[0];
+      let b = message.participantUids[1];
+      let prefix = message.productId + '_';
+      return message.conversationId == prefix + a + '_' + b
+        || message.conversationId == prefix + b + '_' + a;
     }
 
     function isSchoolUser() {
       return request.auth != null
+        && request.auth.token.email_verified == true
         && request.auth.token.email is string
         && request.auth.token.email.matches('.*@triamudomsouth[.]ac[.]th');
     }
 
     function isAdmin() {
-      return request.auth != null
+      return isSchoolUser()
         && request.auth.token.email == '11076@triamudomsouth.ac.th';
     }
 
