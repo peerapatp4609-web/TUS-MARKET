@@ -31,3 +31,30 @@ test('seller can open an existing conversation and normal products allow sending
   assert.equal(vm.runInContext('chatConversation',ctx),'existing');
   assert.equal(el('chatInput').disabled,false);
 });
+
+test('checkout uses current listing data and releases the submit button on a price change',async()=>{
+  const {ctx,el}=harness();
+  const writes=[];
+  let price=25;
+  ctx.confirm=()=>true;
+  ctx.doc=(_collection,...segments)=>({id:segments.join('/')||'new-order'});
+  ctx.serverTimestamp=()=>'<server time>';
+  ctx.runTransaction=async (_db,run)=>run({
+    get:async ref=>({data:()=>ref.id.startsWith('orderRequests/')?undefined:{uid:'seller',approved:true,name:'Book',price}}),
+    set:(id,record)=>writes.push([id,record])
+  });
+  await vm.runInContext("placeOrder({id:'book',name:'Book',price:20},$('buyItem'))",ctx);
+  assert.equal(writes.length,0);
+  assert.equal(el('buyItem').disabled,false);
+  assert.match(el('toast').textContent,/ข้อมูลสินค้าเปลี่ยน/);
+  price=20;
+  await vm.runInContext("placeOrder({id:'book',name:'Book',price:20},$('buyItem'))",ctx);
+  assert.equal(writes.length,2);
+  assert.equal(writes[0][1].buyerUid,'buyer');
+  assert.equal(writes[0][1].sellerUid,'seller');
+  assert.equal(writes[0][1].price,20);
+  assert.equal(writes[0][1].status,'pending');
+  assert.equal(writes[1][1].orderId,'new-order');
+  assert.equal(el('buyItem').disabled,false);
+  clearTimeout(vm.runInContext('showToast.timer',ctx));
+});
